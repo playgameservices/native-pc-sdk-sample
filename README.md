@@ -33,63 +33,63 @@ Also, to sign-in using Google Identity API, you will need to retrieve your [Goog
 
 * Once the application is running correctly, you will be greeted by an OpenGL [scene](docs/screenshots/00.png) with a teapot and "Billing APIs" button
 
-![Teapot Scene](/docs/00.png?raw=true "Teapot Scene")
+![Teapot Scene](/docs/screenshots/00.png?raw=true "Teapot Scene")
 
 * Click on the "Billing APIs" button and a [debug panel](docs/screenshots/01.png) will pop up. Using this panel, you will be able to see a list of the operations you can perform, the API and parameters that will be sent to the server as well as the result once you execute the API request.
 
-![Debug Panel](/docs/01.png?raw=true "Debug Panel")
+![Debug Panel](/docs/screenshots/01.png?raw=true "Debug Panel")
 
 * In the *Select the operation* menu, click on the first menu item "Google Login". The URLs and parameters will automatically change to reflect the backend APIs that will be invoked when you click on the *Execute* button.
 
-![Google Login](/docs/02.png?raw=true "Google Login")
+![Google Login](/docs/screenshots/02.png?raw=true "Google Login")
 
 * Click on the *Execute* button and follow the login process, make sure that you give the permissions requested during the OAuth steps that follows
 
-![Oauth Steps](/docs/03.png?raw=true "OAuth Steps")
+![Oauth Steps](/docs/screenshots/03.png?raw=true "OAuth Steps")
 
-![Oauth Steps](/docs/04.png?raw=true "OAuth Steps")
+![Oauth Steps](/docs/screenshots/04.png?raw=true "OAuth Steps")
 
 * Upon returning, you will get the appropriate *user access token* that can be used to invoke purchase and other subsequent APIs
 
-![User Access Token](/docs/05.png?raw=true "User Access Token")
+![User Access Token](/docs/screenshots/05.png?raw=true "User Access Token")
 
 * With the *user access token* loaded, proceed to *Get SKUs* API which will allow you to get a list of all available IAP items and launch the purchase flow on a hardcoded item
 
-![Get SKUs API](/docs/06.png?raw=true "Get SKUs API")
+![Get SKUs API](/docs/screenshots/06.png?raw=true "Get SKUs API")
 
 * The application will launch the purchase flow using your default browser
 
-![Purchase Flow](/docs/07.png?raw=true "Purchase Flow")
+![Purchase Flow](/docs/screenshots/07.png?raw=true "Purchase Flow")
 
-![Purchase Completed](/docs/08.png?raw=true "Purchase Completed")
+![Purchase Completed](/docs/screenshots/08.png?raw=true "Purchase Completed")
 
 * Get all purchased items using the [Get Purchase API](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.products/get)
 
-![Get Purchased Items](/docs/09.png?raw=true "Get Purchased Items")
+![Get Purchased Items](/docs/screenshots/09.png?raw=true "Get Purchased Items")
 
-![Purchase Token](/docs/10.png?raw=true "Purchase Token")
+![Purchase Token](/docs/screenshots/10.png?raw=true "Purchase Token")
 
 * Validate the purchased item using [Validate Purchase API](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.products)
 
-![Validate Purchase](/docs/11.png?raw=true "Validate Purchase")
+![Validate Purchase](/docs/screenshots/11.png?raw=true "Validate Purchase")
 
-![Validate Purchase Result](/docs/12.png?raw=true "Validate Purchase Result")
+![Validate Purchase Result](/docs/screenshots/12.png?raw=true "Validate Purchase Result")
 
 * Acknowledge the purchased item using [Acknowledge Purchase API](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.products/acknowledge)
 
-![Acknowledge Purchase](/docs/13.png?raw=true "Acknowledge Purchase")
+![Acknowledge Purchase](/docs/screenshots/13.png?raw=true "Acknowledge Purchase")
 
-![Acknowledge Purchase Result](/docs/14.png?raw=true "Acknowledge Purchase Result")
+![Acknowledge Purchase Result](/docs/screenshots/14.png?raw=true "Acknowledge Purchase Result")
   
 * Consume the purchased item using [Consume Purchase API](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.products/consume)
 
-![Consume Purchase](/docs/15.png?raw=true "Consume Purchase")
+![Consume Purchase](/docs/screenshots/15.png?raw=true "Consume Purchase")
 
-![Consume Purchase Result](/docs/16.png?raw=true "Consume Purchase Result")
+![Consume Purchase Result](/docs/screenshots/16.png?raw=true "Consume Purchase Result")
   
  * Invoke get all purchased items using the [Get Purchase API](https://developers.google.com/android-publisher/api-ref/rest/v3/purchases.products/get) and you will see that the API now returns no item as it has been consumed
 
-![Get Purchased Items Result](/docs/17.png?raw=true "Get Purchased Items Result")
+![Get Purchased Items Result](/docs/screenshots/17.png?raw=true "Get Purchased Items Result")
 
 Note that some of the API may return empty string upon success, this is intended and you can modify it in the [API Server](api-server)
   
