@@ -1,0 +1,9 @@
+{
+  "authorization_code": "AUTHORIZATION_CODE_FROM_GOOGL",
+  "authorization_Endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+  "client_id": "<your-client-id>",
+  "client_secret": "<your-client-secret>",
+  "redirect_uri": "http://127.0.0.1:5001/dynasty-teapot-sample/us-central1/UserLogin",
+  "Scopes": "https://www.googleapis.com/auth/googleplay.products%20https://www.googleapis.com/auth/googleplay.purchases",
+  "tokenEndpoint": "https://oauth2.googleapis.com/token"
+}

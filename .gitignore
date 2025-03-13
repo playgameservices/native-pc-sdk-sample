@@ -1,0 +1,9 @@
+
+/.vs
+/x64
+/GameEngine/x64
+/GameApplication/x64
+/vcpkg_installed
+/packages
+GameApplication/deeplink.html
+GameApplication/output.txt
