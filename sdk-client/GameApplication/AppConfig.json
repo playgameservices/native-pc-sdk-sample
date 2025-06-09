@@ -1,0 +1,9 @@
+{
+  "client_id": "<your-service-account-id",
+  "client_secret": "<your-client-secret>",
+  "redirect_uri": "http://localhost:8080",
+  "authorization_Endpoint": "https://accounts.google.com/o/oauth2/v2/auth",
+  "authorization_code": "AUTHORIZATION_CODE_FROM_GOOGL",
+  "Scopes": "https://www.googleapis.com/auth/googleplay.purchases%20https://www.googleapis.com/auth/googleplay.products",
+  "tokenEndpoint": "https://oauth2.googleapis.com/token"
+}

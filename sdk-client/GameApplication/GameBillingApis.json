@@ -1,0 +1,44 @@
+﻿[
+  {
+    "ID": 1,
+    "Method": "API",
+    "MethodName": "Inititialize Billing SDK",
+    "URL": "[&init_done, &init_result](InitializeResult r) {\n\tinit_result = std::move(r);\n\tinit_done = true;\n}"
+  },
+  {
+    "ID": 2,
+    "Method": "API",
+    "MethodName": "Query Product Details",
+    "URL": "QueryProductDetailsParams params: \n\tProductID:{PackageName}\n\t ProductType: {ProdType}"
+  },
+  {
+    "ID": 3,
+    "Method": "API",
+    "MethodName": "IsBillingProgramAvailable",
+    "URL": "IsBillingProgramAvailableParams params: \n\tbilling_program:{billingProgram}"
+  },
+  {
+    "ID": 4,
+    "Method": "API",
+    "MethodName": "CreateBillingProgramReportingDetails",
+    "URL": "CreateBillingProgramReportingDetailsParams params: \n\tProductID:{PackageName}\n\t ProductType: {ProdType}"
+  },
+  {
+    "ID": 5,
+    "Method": "API",
+    "MethodName": "Launch Purchase Flow",
+    "URL": "Launch Purchase Flow"
+  },
+  {
+    "ID": 6,
+    "Method": "API",
+    "MethodName": "Acknowledge Purchase",
+    "URL": "Acknowledge Purchase"
+  },
+  {
+    "ID": 7,
+    "Method": "API",
+    "MethodName": "Consume Purchase",
+    "URL": "Consume Purchase"
+  }
+]

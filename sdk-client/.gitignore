@@ -1,0 +1,11 @@
+/.vs/*
+*.user
+*.txt
+/GameApplication/x64
+/GameEngine/x64
+/vcpkg_installed
+/x64
+*.filters
+/play_pc_sdk_25.5.818.0
+*/bin/*
+*/obj/*

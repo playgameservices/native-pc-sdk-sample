@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Manifest version="1">
+  <Application>
+    <PackageName>your-package-id</PackageName>
+	<IsDeveloperMode>true</IsDeveloperMode>
+    <SKU>your-iap-product-id</SKU>
+  </Application>
+</Manifest>

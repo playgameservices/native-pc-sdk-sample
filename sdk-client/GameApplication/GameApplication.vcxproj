@@ -1,0 +1,972 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 
+     Copyright (C) 2021 The Android Open Source Project
+
+     Licensed under the Apache License, Version 2.0 (the "License");
+     you may not use this file except in compliance with the License.
+     You may obtain a copy of the License at
+
+          http://www.apache.org/licenses/LICENSE-2.0
+
+     Unless required by applicable law or agreed to in writing, software
+     distributed under the License is distributed on an "AS IS" BASIS,
+     WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+     See the License for the specific language governing permissions and
+     limitations under the License.
+-->
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Asan|Android-arm64-v8a">
+      <Configuration>Asan</Configuration>
+      <Platform>Android-arm64-v8a</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Asan|Android-x86_64">
+      <Configuration>Asan</Configuration>
+      <Platform>Android-x86_64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Asan|Win32">
+      <Configuration>Asan</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Asan|x64">
+      <Configuration>Asan</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|Android-arm64-v8a">
+      <Configuration>Debug</Configuration>
+      <Platform>Android-arm64-v8a</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|Android-x86_64">
+      <Configuration>Debug</Configuration>
+      <Platform>Android-x86_64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="HWAsan|Android-arm64-v8a">
+      <Configuration>HWAsan</Configuration>
+      <Platform>Android-arm64-v8a</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="HWAsan|Android-x86_64">
+      <Configuration>HWAsan</Configuration>
+      <Platform>Android-x86_64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="HWAsan|Win32">
+      <Configuration>HWAsan</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="HWAsan|x64">
+      <Configuration>HWAsan</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Android-arm64-v8a">
+      <Configuration>Release</Configuration>
+      <Platform>Android-arm64-v8a</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Android-x86_64">
+      <Configuration>Release</Configuration>
+      <Platform>Android-x86_64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{BE094923-C345-468B-BF1A-293599BE75B4}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>GameApplication</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Android-x86_64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <LinkTimeOptimization>LinkTimeOptimization</LinkTimeOptimization>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Android-arm64-v8a'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <LinkTimeOptimization>LinkTimeOptimization</LinkTimeOptimization>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-x86_64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <LinkTimeOptimization>LinkTimeOptimization</LinkTimeOptimization>
+    <AddressSanitizer>asan</AddressSanitizer>
+    <UseOfStl>cpp_shared</UseOfStl>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Android-x86_64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <LinkTimeOptimization>LinkTimeOptimization</LinkTimeOptimization>
+    <AddressSanitizer>hwasan</AddressSanitizer>
+    <UseOfStl>cpp_shared</UseOfStl>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+    <AndroidMinSdkVersion>34</AndroidMinSdkVersion>
+    <AndroidNdkVersion>26.3.11579264</AndroidNdkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-arm64-v8a'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <LinkTimeOptimization>LinkTimeOptimization</LinkTimeOptimization>
+    <AddressSanitizer>asan</AddressSanitizer>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Android-arm64-v8a'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+    <LinkTimeOptimization>LinkTimeOptimization</LinkTimeOptimization>
+    <AddressSanitizer>hwasan</AddressSanitizer>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+    <AndroidMinSdkVersion>34</AndroidMinSdkVersion>
+    <AndroidNdkVersion>26.3.11579264</AndroidNdkVersion>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-x86_64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <LinkTimeOptimization>LinkTimeOptimization</LinkTimeOptimization>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-arm64-v8a'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+    <LinkTimeOptimization>LinkTimeOptimization</LinkTimeOptimization>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>Application</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v143</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Android-x86_64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-x86_64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Android-x86_64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Android-arm64-v8a'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-arm64-v8a'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Android-arm64-v8a'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-x86_64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-arm64-v8a'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Asan|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <IncludePath>..\play_pc_sdk_v0.9.0\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
+    <LibraryPath>..\play_pc_sdk_v0.9.0\imports;..\vcpkg_installed\x64-windows\debug\lib;..\vcpkg_installed\x64-windows\debug\bin;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;</LibraryPath>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
+    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
+    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Android-x86_64'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidEnablePackaging>true</AndroidEnablePackaging>
+    <AndroidGradleBuildDir>$(SolutionDir)</AndroidGradleBuildDir>
+    <AndroidApplicationModule>$(RootNamespace)</AndroidApplicationModule>
+    <AndroidGradleBuildType>$(Configuration)</AndroidGradleBuildType>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+    <AndroidExtraGradleArgs />
+    <AndroidMissingApplyFromAgdeGradleHandling>Ignore</AndroidMissingApplyFromAgdeGradleHandling>
+    <AndroidGradlePackageOutputName>$(RootNamespace)-$(Configuration).apk</AndroidGradlePackageOutputName>
+    <IncludePath>..\play_pc_sdk_v0.9.0\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
+    <LibraryPath>..\play_pc_sdk_v0.9.0\imports;..\vcpkg_installed\x64-windows\debug\lib;..\vcpkg_installed\x64-windows\debug\bin;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;</LibraryPath>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-x86_64'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidEnablePackaging>true</AndroidEnablePackaging>
+    <AndroidGradleBuildDir>$(SolutionDir)</AndroidGradleBuildDir>
+    <AndroidApplicationModule>$(RootNamespace)</AndroidApplicationModule>
+    <AndroidGradleBuildType>$(Configuration)</AndroidGradleBuildType>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+    <AndroidExtraGradleArgs />
+    <AndroidMissingApplyFromAgdeGradleHandling>Ignore</AndroidMissingApplyFromAgdeGradleHandling>
+    <AndroidGradlePackageOutputName>$(RootNamespace)-$(Configuration).apk</AndroidGradlePackageOutputName>
+    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
+    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Android-x86_64'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidEnablePackaging>true</AndroidEnablePackaging>
+    <AndroidGradleBuildDir>$(SolutionDir)</AndroidGradleBuildDir>
+    <AndroidApplicationModule>$(RootNamespace)</AndroidApplicationModule>
+    <AndroidGradleBuildType>$(Configuration)</AndroidGradleBuildType>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+    <AndroidExtraGradleArgs />
+    <AndroidMissingApplyFromAgdeGradleHandling>Ignore</AndroidMissingApplyFromAgdeGradleHandling>
+    <AndroidGradlePackageOutputName>$(RootNamespace)-$(Configuration).apk</AndroidGradlePackageOutputName>
+    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
+    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Android-arm64-v8a'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidEnablePackaging>true</AndroidEnablePackaging>
+    <AndroidGradleBuildDir>$(SolutionDir)</AndroidGradleBuildDir>
+    <AndroidApplicationModule>$(RootNamespace)</AndroidApplicationModule>
+    <AndroidGradleBuildType>$(Configuration)</AndroidGradleBuildType>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+    <AndroidExtraGradleArgs>
+    </AndroidExtraGradleArgs>
+    <AndroidMissingApplyFromAgdeGradleHandling>Ignore</AndroidMissingApplyFromAgdeGradleHandling>
+    <AndroidGradlePackageOutputName>$(RootNamespace)-$(Configuration).apk</AndroidGradlePackageOutputName>
+    <IncludePath>..\play_pc_sdk_v0.9.0\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
+    <LibraryPath>..\play_pc_sdk_v0.9.0\imports;..\vcpkg_installed\x64-windows\debug\lib;..\vcpkg_installed\x64-windows\debug\bin;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;</LibraryPath>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-arm64-v8a'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidEnablePackaging>true</AndroidEnablePackaging>
+    <AndroidGradleBuildDir>$(SolutionDir)</AndroidGradleBuildDir>
+    <AndroidApplicationModule>$(RootNamespace)</AndroidApplicationModule>
+    <AndroidGradleBuildType>$(Configuration)</AndroidGradleBuildType>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+    <AndroidExtraGradleArgs />
+    <AndroidMissingApplyFromAgdeGradleHandling>Ignore</AndroidMissingApplyFromAgdeGradleHandling>
+    <AndroidGradlePackageOutputName>$(RootNamespace)-$(Configuration).apk</AndroidGradlePackageOutputName>
+    <AndroidApkLocation />
+    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
+    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Android-arm64-v8a'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidEnablePackaging>true</AndroidEnablePackaging>
+    <AndroidGradleBuildDir>$(SolutionDir)</AndroidGradleBuildDir>
+    <AndroidApplicationModule>$(RootNamespace)</AndroidApplicationModule>
+    <AndroidGradleBuildType>$(Configuration)</AndroidGradleBuildType>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+    <AndroidExtraGradleArgs />
+    <AndroidMissingApplyFromAgdeGradleHandling>Ignore</AndroidMissingApplyFromAgdeGradleHandling>
+    <AndroidGradlePackageOutputName>$(RootNamespace)-$(Configuration).apk</AndroidGradlePackageOutputName>
+    <AndroidApkLocation />
+    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
+    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <IncludePath>..\play_pc_sdk_25.5.818.0\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
+    <LibraryPath>..\play_pc_sdk_25.5.818.0\imports;..\vcpkg_installed\x64-windows\debug\lib;..\vcpkg_installed\x64-windows\debug\bin;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(LibraryPath)</LibraryPath>
+    <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
+    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;..\play_pc_sdk_v0.9.0\includes;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
+    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;..\play_pc_sdk_v0.9.0\includes;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
+    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;</LibraryPath>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-x86_64'">
+    <LinkIncremental>false</LinkIncremental>
+    <AndroidEnablePackaging>true</AndroidEnablePackaging>
+    <AndroidGradleBuildDir>$(SolutionDir)</AndroidGradleBuildDir>
+    <AndroidApplicationModule>$(RootNamespace)</AndroidApplicationModule>
+    <AndroidGradleBuildType>$(Configuration)</AndroidGradleBuildType>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+    <AndroidExtraGradleArgs>
+    </AndroidExtraGradleArgs>
+    <AndroidMissingApplyFromAgdeGradleHandling>Ignore</AndroidMissingApplyFromAgdeGradleHandling>
+    <AndroidGradlePackageOutputName>$(RootNamespace)-$(Configuration).apk</AndroidGradlePackageOutputName>
+    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
+    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;</LibraryPath>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-arm64-v8a'">
+    <LinkIncremental>false</LinkIncremental>
+    <AndroidEnablePackaging>true</AndroidEnablePackaging>
+    <AndroidGradleBuildDir>$(SolutionDir)</AndroidGradleBuildDir>
+    <AndroidApplicationModule>$(RootNamespace)</AndroidApplicationModule>
+    <AndroidGradleBuildType>$(Configuration)</AndroidGradleBuildType>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <NativeBuildBackend>MultiToolTaskMSBuild</NativeBuildBackend>
+    <AndroidExtraGradleArgs>
+    </AndroidExtraGradleArgs>
+    <AndroidMissingApplyFromAgdeGradleHandling>Ignore</AndroidMissingApplyFromAgdeGradleHandling>
+    <AndroidGradlePackageOutputName>$(RootNamespace)-$(Configuration).apk</AndroidGradlePackageOutputName>
+    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
+    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;</LibraryPath>
+    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
+    <IncludePath>..\play_pc_sdk_25.5.818.0\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
+    <LibraryPath>..\play_pc_sdk_25.5.818.0\imports;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
+  </PropertyGroup>
+  <PropertyGroup Label="Vcpkg">
+    <VcpkgEnabled>false</VcpkgEnabled>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>play_pc_sdk.lib;Shell32.lib;freeglutd.lib;glew32d.lib;libcurl-d.lib;OpenGL32.lib;restclient-cppd.lib;tinyxml2.lib;zlibd.lib</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>vcpkg install</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Android-x86_64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <WriteCompileCommandsJson>true</WriteCompileCommandsJson>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+      <CppLanguageStandard>cpp11</CppLanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LibraryDependencies>log;atomic;GLESv2;EGL;android</LibraryDependencies>
+      <AdditionalOptions>-u ANativeActivity_onCreate</AdditionalOptions>
+      <AdditionalDependencies>play_pc_sdk.lib;Shell32.lib;freeglutd.lib;glew32d.lib;libcurl-d.lib;OpenGL32.lib;restclient-cppd.lib;tinyxml2.lib;zlibd.lib</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>vcpkg install</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-x86_64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <WriteCompileCommandsJson>true</WriteCompileCommandsJson>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+      <CppLanguageStandard>cpp11</CppLanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LibraryDependencies>log;atomic;GLESv2;EGL;android</LibraryDependencies>
+      <AdditionalOptions>-u ANativeActivity_onCreate</AdditionalOptions>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Android-x86_64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <WriteCompileCommandsJson>true</WriteCompileCommandsJson>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+      <CppLanguageStandard>cpp11</CppLanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LibraryDependencies>log;atomic;GLESv2;EGL;android</LibraryDependencies>
+      <AdditionalOptions>-u ANativeActivity_onCreate</AdditionalOptions>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Android-arm64-v8a'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+      <WriteCompileCommandsJson>true</WriteCompileCommandsJson>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <CppLanguageStandard>cpp11</CppLanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LibraryDependencies>log;atomic;GLESv2;EGL;android;</LibraryDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories);$(SysrootLink)\usr\lib</AdditionalLibraryDirectories>
+      <AdditionalDependencies>play_pc_sdk.lib;Shell32.lib;freeglutd.lib;glew32d.lib;libcurl-d.lib;OpenGL32.lib;restclient-cppd.lib;tinyxml2.lib;zlibd.lib</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>vcpkg install</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-arm64-v8a'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+      <WriteCompileCommandsJson>true</WriteCompileCommandsJson>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <CppLanguageStandard>cpp11</CppLanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LibraryDependencies>log;atomic;GLESv2;EGL;android;</LibraryDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories);$(SysrootLink)\usr\lib</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|Android-arm64-v8a'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+      <WriteCompileCommandsJson>true</WriteCompileCommandsJson>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <CppLanguageStandard>cpp11</CppLanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LibraryDependencies>log;atomic;GLESv2;EGL;android;</LibraryDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories);$(SysrootLink)\usr\lib</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+      <PreprocessToFile>false</PreprocessToFile>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>play_pc_sdk.lib;Shell32.lib;freeglutd.lib;glew32d.lib;libcurl-d.lib;OpenGL32.lib;restclient-cppd.lib;tinyxml2.lib;zlibd.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Asan|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>..\GameApplication\SourceFiles;..\GameEngine;..\GameEngine</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PreprocessToFile>false</PreprocessToFile>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>glew32.lib;freeglut.lib;play_pc_sdk.lib;tinyxml2.lib;Shell32.lib;restclient-cpp.lib;libcurl.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\vcpkg_installed\x64-windows\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='HWAsan|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>..\GameApplication\SourceFiles;..\GameEngine;..\GameEngine</AdditionalIncludeDirectories>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <PreprocessToFile>false</PreprocessToFile>
+      <RuntimeLibrary>MultiThreadedDebugDLL</RuntimeLibrary>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>glew32.lib;freeglut.lib;play_pc_sdk.lib;tinyxml2.lib;Shell32.lib;restclient-cpp.lib;libcurl.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\vcpkg_installed\x64-windows\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>play_pc_sdk.lib;freeglut.lib;Shell32.lib;glew32.lib;libcurl.lib;OpenGL32.lib;restclient-cpp.lib;tinyxml2.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>vcpkg install</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-x86_64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+      <WriteCompileCommandsJson>true</WriteCompileCommandsJson>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <CppLanguageStandard>cpp11</CppLanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalOptions>-u ANativeActivity_onCreate</AdditionalOptions>
+      <LibraryDependencies>log;atomic;GLESv2;EGL;android</LibraryDependencies>
+      <AdditionalDependencies>play_pc_sdk.lib;freeglut.lib;Shell32.lib;glew32.lib;libcurl.lib;OpenGL32.lib;restclient-cpp.lib;tinyxml2.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>vcpkg install</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-arm64-v8a'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+      <WriteCompileCommandsJson>true</WriteCompileCommandsJson>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <CppLanguageStandard>cpp11</CppLanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <LibraryDependencies>log;atomic;GLESv2;EGL;android</LibraryDependencies>
+      <AdditionalDependencies>play_pc_sdk.lib;freeglut.lib;Shell32.lib;glew32.lib;libcurl.lib;OpenGL32.lib;restclient-cpp.lib;tinyxml2.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>vcpkg install</Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PrecompiledHeader>Use</PrecompiledHeader>
+      <WarningLevel>Level3</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\GameApplication\SourceFiles;..\GameEngine;..\GameEngine</AdditionalIncludeDirectories>
+      <PreprocessToFile>false</PreprocessToFile>
+      <RuntimeLibrary>MultiThreadedDLL</RuntimeLibrary>
+      <LanguageStandard>stdcpp20</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Console</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalDependencies>play_pc_sdk.lib;freeglut.lib;Shell32.lib;glew32.lib;libcurl.lib;OpenGL32.lib;restclient-cpp.lib;tinyxml2.lib;zlib.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalLibraryDirectories>..\vcpkg_installed\x64-windows\debug\lib;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+    </Link>
+    <PostBuildEvent>
+      <Command>
+      </Command>
+    </PostBuildEvent>
+    <PreBuildEvent>
+      <Command>
+      </Command>
+    </PreBuildEvent>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClInclude Include="android_native_app_glue.h" />
+    <ClInclude Include="GameAppBaseWin.hpp" />
+    <ClInclude Include="GameAppBillingSDKDialog.hpp" />
+    <ClInclude Include="GameAppGenericClasses.hpp" />
+    <ClInclude Include="resource.h" />
+    <ClInclude Include="pch.h" />
+    <ClInclude Include="GameAppLegacyBillingWindow.hpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="android_native_app_glue.c">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Asan|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='HWAsan|Win32'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='Asan|x64'">true</ExcludedFromBuild>
+      <ExcludedFromBuild Condition="'$(Configuration)|$(Platform)'=='HWAsan|x64'">true</ExcludedFromBuild>
+    </ClCompile>
+    <ClCompile Include="GameApplication.cpp" />
+    <ClCompile Include="pch.cpp">
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Asan|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='HWAsan|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Android-x86_64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Asan|Android-x86_64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='HWAsan|Android-x86_64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|Android-arm64-v8a'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Asan|Android-arm64-v8a'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='HWAsan|Android-arm64-v8a'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Asan|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='HWAsan|x64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Android-x86_64'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|Android-arm64-v8a'">Create</PrecompiledHeader>
+      <PrecompiledHeader Condition="'$(Configuration)|$(Platform)'=='Release|x64'">Create</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="..\play_pc_sdk_25.5.818.0\imports\play_pc_sdk.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <None Include="..\vcpkg.json" />
+    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\bin\tinyxml2.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\debug\bin\freeglutd.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\debug\bin\glew32d.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\debug\bin\libcurl-d.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\debug\bin\zlibd1.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\bin\freeglut.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\bin\glew32.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\bin\libcurl.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\bin\zlib1.dll">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <None Include="AppConfig.json" />
+    <CopyFileToFolders Include="LegacyGameApis.json">
+      <FileType>Document</FileType>
+    </CopyFileToFolders>
+    <None Include="GameBillingApis.json" />
+    <None Include="src\main\java\com\example\gameapplication\MainActivity.java" />
+    <None Include="src\main\java\com\example\gameapplication\NDKHelper.java" />
+    <None Include="src\main\java\com\example\gameapplication\MyApplication.java" />
+    <None Include="userToken.json" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\ShaderPlain.fsh" />
+    <None Include="src\main\assets\Shaders\ShaderPlain.fsh" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\GameEngine\GameEngine.vcxproj">
+      <Project>{d141f6ca-6348-420f-8ffe-25351285308b}</Project>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <CopyFileToFolders Include="manifest.xml" />
+    <Xml Include="src\main\AndroidManifest.xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\VS_ShaderPlain.vsh" />
+    <None Include="src\main\assets\Shaders\VS_ShaderPlain.vsh" />
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="GameApplication.rc" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="bitmap1.bmp" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>
