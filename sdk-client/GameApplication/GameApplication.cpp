@@ -23,7 +23,7 @@
 // Old (blue)
 //float TEAPOT_COLOR[] = { 100 / 255.0f, 149 / 255.0f, 237 / 255.0f };
 // New (green)
-float TEAPOT_COLOR[] = {61 / 255.0f, 220 / 255.0f, 132 / 255.0f};
+float TEAPOT_COLOR[] = {244.0f / 255.0f, 160.0f / 255.0f, 0.0f / 255.0f};
 
 #ifdef __ANDROID__
 #include <jni.h>
@@ -470,7 +470,7 @@ void android_main(android_app* state) {
 #include "TapCamera.h"
 #include <iostream>
 #include <GL/glext.h>
-#include "GameAppLegacyBillingWindow.hpp"
+
 #include "resource.h"
 #include "GameAppBillingSDKDialog.hpp"
 using namespace GameApp;
@@ -479,18 +479,18 @@ LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
 
 class GameApplication {
     enum GameAppIDs {
-        IDR_BTN_BILLING = 11001,
-        IDR_BTN_BILLING_SDK
+
+        IDR_BTN_BILLING_SDK = 11002
     };
 public:
     HDC hDC;
     HGLRC hGLRC;
     HWND hwndMain;
-    HWND btnBilling;
+
     HWND btnBillingSDK;
     TeapotRenderer renderer_;
     ndk_helper::TapCamera camera_;
-    LegacyBillingWindow* mBilling;
+
     HINSTANCE hInstance;
 
     GameApplication() {
@@ -507,10 +507,11 @@ public:
             std::cerr << "ERROR: Failed to create window!" << std::endl;
             exit(EXIT_FAILURE);
         }
-        btnBilling = CreateWindowEx(0, L"BUTTON", L"Billing",
-            WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
-            10, 10, 100, 40, hwndMain, (HMENU)IDR_BTN_BILLING,
-            GetModuleHandle(NULL), NULL);
+
+
+
+
+
         btnBillingSDK = CreateWindowEx(0, L"BUTTON", L"Billing SDK",
             WS_CHILD | WS_VISIBLE | BS_PUSHBUTTON,
             120, 10, 100, 40, hwndMain, (HMENU)IDR_BTN_BILLING_SDK,
@@ -550,18 +551,18 @@ public:
         glClearColor(0.0, 0.0, 0.0, 1.0);
         camera_.Update();
         renderer_.Update(0.13f);
-        GLfloat teapotColor[] = { 0.2f, 0.6f, 0.8f };
-        renderer_.Render(teapotColor);
+        
+        renderer_.Render(TEAPOT_COLOR);
         SwapBuffers(hDC);
     }
 
-    void OnBillingButtonClick() {
-        std::cout << "Billing button clicked!" << std::endl;
-        mBilling = new LegacyBillingWindow(hInstance);
-        mBilling->Show();
-        InvalidateRect(hwndMain, NULL, FALSE);  // Only invalidate the OpenGL area
-        UpdateWindow(hwndMain);
-    }
+
+
+
+
+
+
+
 
     void OnBillingSDKButtonClick() {
         std::cout << "Billing SDK button clicked!" << std::endl;
@@ -593,9 +594,9 @@ public:
         }
         case WM_COMMAND:
             switch (LOWORD(wParam)) {
-            case IDR_BTN_BILLING: 
-                app->OnBillingButtonClick();
-                break;
+
+
+
             case IDR_BTN_BILLING_SDK:
                 //app->OnBillingSDKButtonClick();
                 GameAppBillingSdkDialog* sdk = new GameAppBillingSdkDialog(app->hInstance);

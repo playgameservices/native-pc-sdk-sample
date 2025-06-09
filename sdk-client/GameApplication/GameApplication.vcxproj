@@ -869,7 +869,6 @@
     <ClInclude Include="GameAppGenericClasses.hpp" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="pch.h" />
-    <ClInclude Include="GameAppLegacyBillingWindow.hpp" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="android_native_app_glue.c">
