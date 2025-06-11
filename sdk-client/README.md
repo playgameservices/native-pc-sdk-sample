@@ -1,65 +1,75 @@
 ﻿# Teapot Sample
 
-This project demonstrates Windows and Android sharing C++ code.
+This project demonstrates the use of [Google Play Games for PC Native SDK](https://developer.android.com/games/playgames/native-pc/) to [seamlessly sign-in](https://developer.android.com/games/playgames/native-pc/pgs) and [sell digital content](https://developer.android.com/games/playgames/native-pc/billing).
 
 ## Windows Setup
 
-In order to build run this sample on Windows you will need libraries 'freeglut' and 'glew'.
+In order to build run this sample on Windows you will need to fulfil 3P dependencies.
 
-One way to get these is to use vcpkg:
-Common reqirement for Game Engine
-```
-./vcpkg install freeglut:x64-windows
-./vcpkg install glew:x64-windows
-./vcpkg install freeglut:x86-windows
-./vcpkg install glew:x86-windows
-```
-Integrated vcpkg and moved the play_pc_sdk under root\Library folder.
-with this we don't need to copy the vcpkg and play_pc_sdk dll in all the folders
+One way to get these is to use [vcpkg](https://vcpkg.io/en/getting-started.html):
 
-```make sure the librars and dlls are availble in the root\Library and root\vcpkg\installed folder 
-and in the solution root folder.```
-
-For SDK version
 ```
-unzip play_pc_sdk_v0.8.0.zip on root folder
-Install Google play games beta
-```
-For legancy billing version
-```
-    "nlohmann-json",
-    {
-      "name": "google-cloud-cpp",
-      "default-features": false,
-      "features": [ "storage" ]
-    },
-    "tinyxml2",
-    "boost-asio",
-	"boost-beast",
-	"boost-json",
-	"restclient-cpp"
+vcpkg install
 ```
 
-Run command on the cmd root directory 
-```
-c:\path-to-vcpkg\vcpkg install
-```
-The vcpkg tool can be installed using these instructions: https://vcpkg.io/en/getting-started.html 
+You will also need the [play_pc_sdk](https://developer.android.com/games/playgames/native-pc/downloads/cpp) in the solution folder.
 
-Update AppConfig.json file
 ```
-Replace   "client_id": "xxxx", & "client_secret": "xxxxx",
-with your client_id and client_secret
+unzip play_pc_sdk.zip in the solution folder
 ```
 
-Edit Register run the command
-```
-reg add "HKLM\Software\Google\Play Games Services" /v EarlyAccessPartnerGuid /t REG_SZ /d c0f10adb-4e19-4cb0-b191-c7b77f0d0b9d
-```
+Of course, install [Google Play Games for PC client application](https://play.google.com/googleplaygames).
 
-Install and run Google Play Games
-```
-Google Play Games BETA - https://play.google.com/googleplaygames
-Login with personal/gamer email ID
-```
+## Play Console Setup
 
+You will need to setup billing from your [Play Console Application](https://developer.android.com/distribute/console) and [Create in-app products](https://developer.android.com/guide/playpoints/create-products) for purchase in this sample.
+
+## Building the application
+
+* Open [Teapot.sln](Teapot.sln) file using any recent version of Microsoft Visual Studio.
+
+* Open [AppConfig.json](GameApplication/AppConfig.json) and replace the same _client_id_ and _client_secret_ with your Google API client-id and secret.
+
+* Press F5 to build and run your application.
+
+## Running the application
+
+* Once the application is running correctly, you will be greeted by an OpenGL [scene](/docs/screenshots/sdk-client/00.png) with a teapot and "Billing SDK" button.
+
+![Teapot Scene](/docs/screenshots/sdk-client/00.png?raw=true "Teapot Scene")
+
+* Click on the "Billing SDK" button and a [debug panel](/docs/screenshots/sdk-client/01.png) will pop up. Using this panel, you will be able to see a list of the operations you can perform, the [SDK interfaces](https://developer.android.com/games/playgames/native-pc/reference) and parameters that will be sent to the server as well as the result once you execute the SDK function.
+
+![Debug Panel](/docs/screenshots/sdk-client/01.png?raw=true "Debug Panel")
+
+* In the *Select the operation* menu, click on the first menu item "Initialize Billing SDK". The parameters will automatically change to reflect the parameters that will be passed when you click on the *Run* button.
+
+* Click on the *Run* button and upon the initialization function call return, the result will be updated in the *Result* area. Once the initialization is completed successfully, you will be able to call the rest of the functions in the SDK.
+
+* There are steps that you need to adhere to such as checking for purchases completed outside of your app whenever your application re-enters background. For the most updated list of requirements, checkout the [documentation](https://developer.android.com/games/playgames/native-pc/billing).
+
+![Initialization and Result](/docs/screenshots/sdk-client/02.png?raw=true "Initialization and Result")
+
+* To get the list of products users can purchase and the localized information that can be used to be displayed to the user, you can issue call to [QueryProductDetails](https://developer.android.com/games/playgames/native-pc/reference/class/google/play/billing/billing-client#queryproductdetails).
+
+![Query Product Details](/docs/screenshots/sdk-client/03.png?raw=true "Query Product Details")
+
+* Once the user select a product and decide to purchase, you need to call [LaunchPurchaseFlow](https://developer.android.com/games/playgames/native-pc/reference/class/google/play/billing/billing-client#launchpurchaseflow) to start the purchase flow process.
+
+![Launch Purchase Flow](/docs/screenshots/sdk-client/04.png?raw=true "Launch Purchase Flow")
+
+* The user may be directed to external browser application to complete the purchase.
+
+![User Default Browser Application](/docs/screenshots/sdk-client/05.png?raw=true "User Default Browser Application")
+
+* The entire process will be completed safely, including adding/choosing payment method, fraud prevention, etc. Once the purchase flow is completed, your application can check the [LaunchPurchaseFlowResult](https://developer.android.com/games/playgames/native-pc/reference/class/google/play/result) and retrieve [LaunchPurchaseFlowResultValue](https://developer.android.com/games/playgames/native-pc/reference/struct/google/play/billing/launch-purchase-flow-result-value#structgoogle_1_1play_1_1billing_1_1_launch_purchase_flow_result_value).
+
+![Purchase Completed](/docs/screenshots/sdk-client/06.png?raw=true "Purchase Completed")
+
+* Acknowledge the purchased item by calling [AcknowledgePurchase](https://developer.android.com/games/playgames/native-pc/reference/class/google/play/billing/billing-client#acknowledgepurchase).
+
+![Acknowledge Purchase](/docs/screenshots/sdk-client/07.png?raw=true "Acknowledge Purchase")
+
+* Consume the purchased item by calling [ConsumePurchase](https://developer.android.com/games/playgames/native-pc/reference/class/google/play/billing/billing-client#consumepurchase) if you intend to let the user purchase the same product again.
+
+![Consume Purchase](/docs/screenshots/sdk-client/08.png?raw=true "Consume Purchase")
