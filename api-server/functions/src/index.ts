@@ -27,7 +27,7 @@ import * as purchases from './purchases';
 import * as rtdn from './notifications';
 import * as tokensdb from './tokensdb';
 import * as skuDetailsApi from './skuDetailsApi';
-import { topicID } from './config';
+import { topicID, packageName } from './config';
 
 import { HttpsError } from 'firebase-functions/lib/providers/https';
 
@@ -166,6 +166,22 @@ app.get(
     const productId = request.query.productId + '';
     const token = request.query.token + '';
     const result = await purchases.verifyPurchaseToken(productId, token);
+    functions.logger.info('verify result', result);
+    response.json(result);
+  },
+);
+
+app.post(
+  '/verifyIntegrityToken',
+  async (request: functions.Request, response: functions.Response) => {
+    functions.logger.info('verifyIntegrityToken', request.query);
+    functions.logger.info('body: ' + JSON.stringify(request.body));
+    const token = (request.query.token || request.body.token) + '';
+    const packageNameVal =
+      (request.query.packageName || request.body.packageName || packageName) + '';
+    functions.logger.info('token: ' + token);
+    functions.logger.info('packageName: ' + packageNameVal);
+    const result = await purchases.verifyIntegrityToken(token, packageNameVal);
     functions.logger.info('verify result', result);
     response.json(result);
   },

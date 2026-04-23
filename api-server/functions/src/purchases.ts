@@ -110,6 +110,53 @@ export async function verifyPurchaseToken(productId: string, token: string): Pro
 }
 
 /**
+ * Verify the Play Integrity token.
+ *
+ * @param {string} token the integrity token
+ * @param {string} packageName the app package name
+ * @return {Promise<any>} the verification result
+ */
+export async function verifyIntegrityToken(token: string, packageName: string): Promise<any> {
+  try {
+    const szUrl = `https://playintegrity.googleapis.com/v1/${packageName}:decodePcIntegrityToken`;
+    const result = await jwtClient.request({
+      url: szUrl,
+      method: 'POST',
+      data: {
+        integrity_token: token,
+      },
+    });
+    functions.logger.debug('url: ' + szUrl);
+    functions.logger.debug(result.data);
+
+    const payload = result.data as any;
+    const tokenPayload = payload.tokenPayloadExternal;
+
+    if (!tokenPayload || !tokenPayload.requestDetails) {
+      return { result: false, error: 'Invalid response from Play Integrity API', payload: payload };
+    }
+
+    if (tokenPayload.requestDetails.requestPackageName !== packageName) {
+      return { result: false, error: 'Package name mismatch', payload: payload };
+    }
+
+    const verdicts = tokenPayload.deviceIntegrity?.deviceRecognitionVerdict;
+    if (verdicts && verdicts.includes('MEETS_PC_INTEGRITY')) {
+      return {
+        result: true,
+        hash: tokenPayload.requestDetails.requestHash || '',
+        payload: payload,
+      };
+    } else {
+      return { result: false, error: 'Device does not meet PC integrity', payload: payload };
+    }
+  } catch (error) {
+    console.error(`Error calling verifyIntegrityToken : ${error}`);
+    return { result: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
+/**
  *  Return all the purchases completed by the user from the Play Developer API. <FOR LEGACY API>
  *
  * @param {string} userAccessToken is the access token of the user whose purchases are to be listed
