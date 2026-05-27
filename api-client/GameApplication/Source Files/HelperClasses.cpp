@@ -191,7 +191,7 @@ namespace GameApplication {
         try {
             Process^ process = gcnew Process();
             process->StartInfo->FileName = "cmd.exe";  // Running cmd.exe
-            process->StartInfo->Arguments = "/C gcloud auth print-access-token --impersonate-service-account=101904050147-compute@developer.gserviceaccount.com --project=dynasty-sample "; // Command to run  --scopes=https://www.googleapis.com/auth/androidpublisher,https://www.googleapis.com/auth/cloud-platform,openid,https://www.googleapis.com/auth/userinfo.email
+            process->StartInfo->Arguments = "/C gcloud auth print-access-token --impersonate-service-account=<project-number>-compute@developer.gserviceaccount.com --project=<project-name> "; // Command to run  --scopes=https://www.googleapis.com/auth/androidpublisher,https://www.googleapis.com/auth/cloud-platform,openid,https://www.googleapis.com/auth/userinfo.email
             process->StartInfo->RedirectStandardOutput = true;
             process->StartInfo->RedirectStandardError = true;
             process->StartInfo->UseShellExecute = false;
