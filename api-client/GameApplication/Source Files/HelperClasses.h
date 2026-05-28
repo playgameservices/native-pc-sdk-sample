@@ -199,8 +199,6 @@ namespace GameApplication {
 	//Util-Functions
 	String^ GetLocalIPAddress();
 	Dictionary<String^, String^>^ ParseQueryParameters(String^ url);
-	String^ GetServiceAccountToken();
-	String^ GetServerAccessToken(String^ userToken);
 
 
 

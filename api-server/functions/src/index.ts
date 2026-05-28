@@ -231,7 +231,7 @@ app.post('/postSkuDetails', async (request: functions.Request, response: functio
   // curl -X POST "https://dynasty-teapot-sample.web.app/api/postSkuDetails" -H 'Content-Type: application/json' -d '{"key1":"value1", "key2":"value2"}
   functions.logger.debug('body: ' + JSON.stringify(request.body)); // body: {"key1":"value1", "key2":"value2"}
   const userAccessToken = request.body.userAccessToken;
-  functions.logger.debug('userAccessToken: ' + userAccessToken);
+  // functions.logger.debug('userAccessToken: ' + userAccessToken);
   const result = await skuDetailsApi.testSkuDetails(userAccessToken, 'iap_dynasty_89');
   response.json({
     hello: result,

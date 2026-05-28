@@ -127,7 +127,7 @@ export async function verifyIntegrityToken(token: string, packageName: string): 
       },
     });
     functions.logger.debug('url: ' + szUrl);
-    functions.logger.debug(result.data);
+    // functions.logger.debug(result.data);
 
     const payload = result.data as any;
     const tokenPayload = payload.tokenPayloadExternal;

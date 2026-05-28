@@ -9,3 +9,6 @@ GameApplication/deeplink.html
 GameApplication/output.txt
 *play_pc_sdk*
 *.gradle*
+
+*.pem
+.env

@@ -18,10 +18,12 @@
  * This file is so a user can set their desired constants for their account.
  */
 
-// service account credentials
-export const serviceAccountEmail = '<project-number>-compute@developer.gserviceaccount.com';
+// SECURITY: never commit service-account keys. Load from the Functions
+// runtime environment (set via `firebase functions:secrets:set SA_KEY`).
+export const serviceAccountEmail =
+  process.env.SA_EMAIL ?? '<SERVICE_ACCOUNT_EMAIL>';
 export const serviceAccountPrivateKey =
-  '-----BEGIN PRIVATE KEY-----\nMy private key\n-----END PRIVATE KEY-----\n';
+  (process.env.SA_KEY ?? '<SERVICE_ACCOUNT_PRIVATE_KEY>').replace(/\\n/g, '\n');
 
 // app package name
 export const packageName = 'com.dynasty.pconlygame';

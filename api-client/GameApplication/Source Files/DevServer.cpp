@@ -106,13 +106,6 @@ namespace GameApplication {
             HttpClient^ client = gcnew HttpClient();
             client->BaseAddress = uri;
 
-            //ya29.c.c0ASRK0GZ0pd-JdqCTGPKveNp0USw6zR6KwfzhzHLHr3fDVzBHGTBvNNzb6DLl5-KBQafGVy7lijKewrcb1p7kwDyVCLiH4o1KPdLYRN0tQrtV4gjY91ZJ3gw_mg6LICE9hECB9vC3Dt9j8LX9wUZxq7A0ER0ibzWIRPGIIkQ7S21xyY3jhP-GA09DTBYCIETPrkfaTFpXEBaL9K5Xd_VwhW7t0Cy-bFpab0Ccx_N-dzuzmXOuZlyqrTMF9jT1tma7VyI62RpBgnfuXLC5z6nSZEWCU2-2y4SmhxNv772RFZrKWuubuhTAVeqMHv6cxoLoG-B0Vzmz6WgvjNL4MiZpPldlILMVvFM1jVwM3_E3vKVMwQeiVbaVoxBfE385DoU8353XaSvFgn13hmRYsbre4yfq2F0F2aM3coMSxfgW0anSS2e3cJaB1XJd4MvJlaSnwB2Yd6oig2BhiZbwaB0zXk9swZdRZBspcxZaSzOcV0c1u-rxBinrYd-IusevmrlRt7iqvmh2_-ttx_r60xWRRuF0sBBvzoRrrUrcIzxegjR_6m67OYcZ-Q1pYZg3z9xolb1_aYkg4VJZ9SkWZvXVuheY8lehVevycOilghX5ke0dv9MSmg517WfuOg93gIkuIksbWV4m4bqQVJfad2JJ9IyaRr-Y11vfQhnScRk12UdQBOb9rU8sf1id_uj8M45v6b08SZBpmewdUJdxBu_ZwrhIfxFI6SmZxShaUZneXuY2M0abcvbccmFo6y6bc0hY3SxxJRM4yz8JS0F-Rb43SQUh14iJ2hk2zllSRSab475w-wyaSXjSUwv-MSnYY2xZdvnk-2X8uFUhk8ciVrbImY1yd_VJjRS-xoUWyBXqn8c5nvu_O69WQ2navzII2wpmYpJjIbv4IfRUSo2ic67ttu3inW1u4W4iwX-MrihsZh1xdV4IQuanyaxi7Z6d7Wj3Jqb9SieMqqwz09UqcM7yeMSS_glpVsmIVJaSgrobrgzk71kWYVw-zag
-            String^ token = serviceToken ? sharedData->sdServiceAccessToken : sharedData->sdResposne->access_token;
-            //String^ token = "ya29.c.c0ASRK0GZ0pd-JdqCTGPKveNp0USw6zR6KwfzhzHLHr3fDVzBHGTBvNNzb6DLl5-KBQafGVy7lijKewrcb1p7kwDyVCLiH4o1KPdLYRN0tQrtV4gjY91ZJ3gw_mg6LICE9hECB9vC3Dt9j8LX9wUZxq7A0ER0ibzWIRPGIIkQ7S21xyY3jhP-GA09DTBYCIETPrkfaTFpXEBaL9K5Xd_VwhW7t0Cy-bFpab0Ccx_N-dzuzmXOuZlyqrTMF9jT1tma7VyI62RpBgnfuXLC5z6nSZEWCU2-2y4SmhxNv772RFZrKWuubuhTAVeqMHv6cxoLoG-B0Vzmz6WgvjNL4MiZpPldlILMVvFM1jVwM3_E3vKVMwQeiVbaVoxBfE385DoU8353XaSvFgn13hmRYsbre4yfq2F0F2aM3coMSxfgW0anSS2e3cJaB1XJd4MvJlaSnwB2Yd6oig2BhiZbwaB0zXk9swZdRZBspcxZaSzOcV0c1u-rxBinrYd-IusevmrlRt7iqvmh2_-ttx_r60xWRRuF0sBBvzoRrrUrcIzxegjR_6m67OYcZ-Q1pYZg3z9xolb1_aYkg4VJZ9SkWZvXVuheY8lehVevycOilghX5ke0dv9MSmg517WfuOg93gIkuIksbWV4m4bqQVJfad2JJ9IyaRr-Y11vfQhnScRk12UdQBOb9rU8sf1id_uj8M45v6b08SZBpmewdUJdxBu_ZwrhIfxFI6SmZxShaUZneXuY2M0abcvbccmFo6y6bc0hY3SxxJRM4yz8JS0F-Rb43SQUh14iJ2hk2zllSRSab475w-wyaSXjSUwv-MSnYY2xZdvnk-2X8uFUhk8ciVrbImY1yd_VJjRS-xoUWyBXqn8c5nvu_O69WQ2navzII2wpmYpJjIbv4IfRUSo2ic67ttu3inW1u4W4iwX-MrihsZh1xdV4IQuanyaxi7Z6d7Wj3Jqb9SieMqqwz09UqcM7yeMSS_glpVsmIVJaSgrobrgzk71kWYVw-zag";
-            //token = sharedData->sdAccessToken;
-            //if (bearer)
-            //    client->DefaultRequestHeaders->Authorization = gcnew
-            //    Headers::AuthenticationHeaderValue("Bearer", token);//("Bearer",token);
             Task<HttpResponseMessage^>^ responseTask = client->GetAsync(escapeUrl);//"&" + urlparts[1]);
             responseTask->Wait();
             response = responseTask->Result;
