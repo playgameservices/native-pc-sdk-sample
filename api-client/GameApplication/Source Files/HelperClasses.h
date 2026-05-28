@@ -49,6 +49,7 @@ namespace GameApplication {
 		VerifyThePurchaseToken,	//3
 		AcknowledgeThePurchase,	//4
 		ConsumePurchases,		//5
+		VerifyIntegrityToken,	//6
 	};
 
 	[DataContract]

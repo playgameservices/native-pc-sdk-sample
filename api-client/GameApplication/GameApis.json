@@ -1,4 +1,4 @@
-﻿[
+[
   {
     "ID": 0,
     "Method": "Get",
@@ -50,6 +50,15 @@
     "Method": "POST",
     "MethodName": "Consume purchases",
     "URL": "https://dynasty-teapot-sample.web.app/api/consumePurchase?packageName={packageName}&productId={productId}&token={token}",
+    "Parameter": "category",
+    "Bearer": "token",
+    "PostData": ""
+  },
+  {
+    "ID": 6,
+    "Method": "POST",
+    "MethodName": "Verify Integrity Token",
+    "URL": "https://dynasty-teapot-sample.web.app/api/verifyIntegrityToken?packageName={packageName}&token={token}",
     "Parameter": "category",
     "Bearer": "token",
     "PostData": ""
