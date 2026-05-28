@@ -6,12 +6,18 @@
 #include "billing\client.h"
 #include <initialization/models.h>
 #include <initialization/initialization.h>
-#include <billing\enums.h>
+#include <integrity/enums.h>
+#include <integrity/client.h>
+#include <integrity/models.h>
+#include <billing/client.h>
+#include <billing/enums.h>
 #include <format>
 #include <billing/models.h>
 #include <future>
+#include <restclient-cpp/restclient.h>
 using namespace google::play::initialization;
 using namespace google::play::billing;
+using namespace google::play::integrity;
 
 namespace GameApp {
     // Define the list items as an array of strings
@@ -22,7 +28,10 @@ namespace GameApp {
         L"CreateBillingProgramReportingDetails",
         L"Launch Purchase Flow",
         L"Acknowledge Purchase",
-        L"Consume Purchase"
+        L"Consume Purchase",
+        L"Prepare Integrity Token",
+        L"Request Integrity Token",
+        L"Verify Integrity Token",
     };
 
     static const wstring IsBillingOptions[2] = {
@@ -47,6 +56,12 @@ namespace GameApp {
             appEvents[BillingOps::kAcknowledgePurchase].onClick = bind(&GameAppBillingSdkDialog::OnClickAcknowledgePurchase, this, std::placeholders::_1);
             appEvents[BillingOps::kConsumePurchase].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedConsumePurchase, this, std::placeholders::_1);
             appEvents[BillingOps::kConsumePurchase].onClick = bind(&GameAppBillingSdkDialog::OnClickConsumePurchase, this, std::placeholders::_1);
+            appEvents[BillingOps::kPrepareIntegrityToken].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedPrepareIntegrityToken, this, std::placeholders::_1);
+            appEvents[BillingOps::kPrepareIntegrityToken].onClick = bind(&GameAppBillingSdkDialog::OnClickPrepareIntegrityToken, this, std::placeholders::_1);
+            appEvents[BillingOps::kRequestIntegrityToken].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedRequestIntegrityToken, this, std::placeholders::_1);
+            appEvents[BillingOps::kRequestIntegrityToken].onClick = bind(&GameAppBillingSdkDialog::OnClickRequestIntegrityToken, this, std::placeholders::_1);
+            appEvents[BillingOps::kVerifyIntegrityToken].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedVerifyIntegrityToken, this, std::placeholders::_1);
+            appEvents[BillingOps::kVerifyIntegrityToken].onClick = bind(&GameAppBillingSdkDialog::OnClickVerifyIntegrityToken, this, std::placeholders::_1);
         }
 
         ~GameAppBillingSdkDialog() {}
@@ -85,6 +100,12 @@ namespace GameApp {
         IsBillingProgramAvailableResult* mIsBillingProgramAvailableResult;
         IsBillingProgramAvailableResultValue mIsBillingProgramAvailableResultValue;
 
+        // Play Integrity API
+		IntegrityClient* mIntegrityClient = nullptr;
+        PrepareIntegrityTokenResultValue* mPrepareIntegrityTokenResValue = nullptr;
+        RequestIntegrityTokenResultValue* mRequestIntegrityTokenResValue = nullptr;
+        std::string mCachedRequestHash;
+
         // Application Settings
         Manifest manifest;
 
@@ -107,6 +128,9 @@ namespace GameApp {
             kLaunchPurchaseFlow,
             kAcknowledgePurchase,
             kConsumePurchase,
+            kPrepareIntegrityToken,
+            kRequestIntegrityToken,
+            kVerifyIntegrityToken,
             Count
         };
         EPair<FPEvents>appEvents[BillingOps::Count];
@@ -408,7 +432,9 @@ namespace GameApp {
                     return;
                 }
                 m_bCanMoveToStage = true;
-                win->mBillingClient = new BillingClient();
+                BillingClientParams params;
+				params.enable_pending_purchases = true;
+                win->mBillingClient = new BillingClient(params);
                 message = L"SDK Initialization completed successfully. \r\nBilling client created.";
                 GameLogging::Info(wstringTostring(message.c_str()));
                 SetWindowText(win->hResult, message.c_str());
@@ -771,6 +797,192 @@ namespace GameApp {
                 m_bCanMoveToStage = true;
             }
         }
+    
+		void initializeIntegrityClient() {
+			if (!mIntegrityClient) {
+				mIntegrityClient = new IntegrityClient();
+			}
+		}
+        
+        void OnSelectedPrepareIntegrityToken(void* ptr) {
+            GameLogging::Info("OnSelectedPrepareIntegrityToken");
+        }
+
+        void OnSelectedRequestIntegrityToken(void* ptr) {
+            GameLogging::Info("OnSelectedRequestIntegrityToken");
+        }
+
+        void OnSelectedVerifyIntegrityToken(void* ptr) {
+            GameLogging::Info("OnSelectedVerifyIntegrityToken");
+        }
+        
+        void OnClickPrepareIntegrityToken(void* ptr) {
+            GameLogging::Info("OnClickPrepareIntegrityToken");
+            
+            if (mIntegrityClient == nullptr) {
+				initializeIntegrityClient();
+            }
+			
+            PrepareIntegrityTokenParams param;
+            param.cloud_project_number = 83701981335; // TODO: Replace with your Google Cloud project number
+
+            std::atomic_bool done = false;
+            PrepareIntegrityTokenResult* resultPtr = nullptr;
+
+			mIntegrityClient->PrepareIntegrityToken(param, [&done, &resultPtr](PrepareIntegrityTokenResult r) {
+                resultPtr = new PrepareIntegrityTokenResult(std::move(r));
+                done = true;
+			});
+
+            while (!done) {
+                Sleep(100);
+            }
+
+            if (!resultPtr->ok()) {
+                GameLogging::Error(std::format("PrepareIntegrityToken failed with error code {} and message {}", (int)resultPtr->code(), resultPtr->error_message()));
+                SetWindowText(hResult, L"PrepareIntegrityToken failed");
+            }
+            else {
+                GameLogging::Info("PrepareIntegrityToken completed successfully");
+                if (mPrepareIntegrityTokenResValue) {
+                    delete mPrepareIntegrityTokenResValue;
+                }
+                mPrepareIntegrityTokenResValue = new PrepareIntegrityTokenResultValue(resultPtr->value());
+                SetWindowText(hResult, L"PrepareIntegrityToken completed successfully");
+            }
+            delete resultPtr;
+        }
+
+        void OnClickRequestIntegrityToken(void* ptr) {
+            GameLogging::Info("OnClickRequestIntegrityToken");
+            if (mIntegrityClient == nullptr) {
+				initializeIntegrityClient();
+            }
+            if (mPrepareIntegrityTokenResValue == nullptr) {
+                GameLogging::Error("PrepareIntegrityToken must be called successfully before RequestIntegrityToken");
+                SetWindowText(hResult, L"Error: Call PrepareIntegrityToken first");
+                return;
+            }
+
+            mCachedRequestHash = std::to_string(std::time(nullptr));
+            RequestIntegrityTokenParams param {
+                mPrepareIntegrityTokenResValue->request_token_data,
+                mCachedRequestHash
+            };
+
+            std::atomic_bool done = false;
+            RequestIntegrityTokenResult* resultPtr = nullptr;
+
+			mIntegrityClient->RequestIntegrityToken(param, [&done, &resultPtr](RequestIntegrityTokenResult r) {
+                resultPtr = new RequestIntegrityTokenResult(std::move(r));
+                done = true;
+			});
+
+            while (!done) {
+                Sleep(100);
+            }
+
+            if (!resultPtr->ok()) {
+                GameLogging::Error(std::format("RequestIntegrityToken failed with error code {} and message {}", (int)resultPtr->code(), resultPtr->error_message()));
+                SetWindowText(hResult, L"RequestIntegrityToken failed");
+            }
+            else {
+                GameLogging::Info("RequestIntegrityToken completed successfully");
+                if (mRequestIntegrityTokenResValue) {
+                    delete mRequestIntegrityTokenResValue;
+                }
+                mRequestIntegrityTokenResValue = new RequestIntegrityTokenResultValue(resultPtr->value());
+                SetWindowText(hResult, L"RequestIntegrityToken completed successfully");
+                
+                GameLogging::Info("Token snippet: " + mRequestIntegrityTokenResValue->token_bytes.substr(0, 20) + "...");
+            }
+            delete resultPtr;
+        }
+
+        void OnClickVerifyIntegrityToken(void* ptr) {
+            GameLogging::Info("OnClickVerifyIntegrityToken");
+            static bool bAllowUnlicensed = false;
+            bool bContinueExecution = false;
+            if (mRequestIntegrityTokenResValue == nullptr) {
+                GameLogging::Error("RequestIntegrityToken must be called successfully before VerifyIntegrityToken");
+                SetWindowText(hResult, L"Error: Call RequestIntegrityToken first");
+                return;
+            }
+
+            GameLogging::Info("Token to verify: " + mRequestIntegrityTokenResValue->token_bytes);
+            
+            try {
+                nlohmann::json jsonPayload;
+                jsonPayload["packageName"] = manifest.App.PackageName;
+                jsonPayload["token"] = mRequestIntegrityTokenResValue->token_bytes;
+                std::string payload = jsonPayload.dump();
+                
+                std::string url = "https://dynasty-teapot-sample.web.app/api/verifyIntegrityToken";
+                std::string content_type = "application/json";
+                
+                RestClient::Response response = RestClient::post(url, content_type, payload);
+                
+                if (response.code == 200) {
+                    auto resJson = nlohmann::json::parse(response.body);
+                    if (resJson.contains("result") && resJson["result"].get<bool>()) {
+                        std::string receivedHash = resJson.contains("hash") ? resJson["hash"].get<std::string>() : "";
+                        if (receivedHash == mCachedRequestHash) {
+                            GameLogging::Info("Hash matches and PIA returns 200 but we need to check licensing verdict");
+                            std::string licensingVerdict = "";
+                            try {
+                                if (resJson.contains("payload") && 
+                                    resJson["payload"].contains("tokenPayloadExternal") &&
+                                    resJson["payload"]["tokenPayloadExternal"].contains("accountDetails") &&
+                                    resJson["payload"]["tokenPayloadExternal"]["accountDetails"].contains("appLicensingVerdict")) {
+                                    licensingVerdict = resJson["payload"]["tokenPayloadExternal"]["accountDetails"]["appLicensingVerdict"].get<std::string>();
+                                }
+                            } catch (nlohmann::json::exception& e) {
+                                GameLogging::Error(std::format("Exception parsing licensing verdict: {}", e.what()));
+                            }
+
+                            if (licensingVerdict == "LICENSED") {
+                                GameLogging::Info("Verification successful! Hash matches and licensed.");
+                                SetWindowText(hResult, L"Verification successful! Hash matches and licensed.");
+                                bContinueExecution = true;
+                            } else if ( bAllowUnlicensed ) {
+                                GameLogging::Info("Verification successful! Hash matches but unlicensed.");
+                                SetWindowText(hResult, L"Verification successful! Hash matches but unlicensed.");
+                                bContinueExecution = true;
+                            } else {
+                                GameLogging::Error("Verification failed: Unlicensed! Verdict: " + licensingVerdict);
+                                SetWindowText(hResult, stringToWstring("Verification failed: Unlicensed (" + licensingVerdict + ")").c_str());
+                            }
+                        } else {
+                            GameLogging::Error("Verification failed: Hash mismatch! Sent: " + mCachedRequestHash + ", Received: " + receivedHash);
+                            SetWindowText(hResult, stringToWstring("Verification failed: Hash mismatch!").c_str());
+                        }
+                    } else {
+                        std::string error = resJson.contains("error") ? resJson["error"].get<std::string>() : "Unknown error";
+                        GameLogging::Error("Verification failed: " + error);
+                        SetWindowText(hResult, stringToWstring("Verification failed: " + error).c_str());
+                    }
+                } else {
+                    GameLogging::Error("HTTP Error: " + std::to_string(response.code));
+                    SetWindowText(hResult, stringToWstring("HTTP Error: " + std::to_string(response.code)).c_str());
+                }
+            }
+            catch (std::exception& e) {
+                GameLogging::Error(std::format("Exception in OnClickVerifyIntegrityToken: {}", e.what()));
+                SetWindowText(hResult, L"Exception during verification");
+            }
+
+            if (!bContinueExecution) {
+                GameLogging::Error("Verification failed: PIA check has failed.");
+                int result = MessageBox(m_hWnd, L"PIA check has failed. Do you want to continue execution?", L"Verification Failed", MB_YESNO | MB_ICONWARNING);
+                if (result == IDNO) {
+                    GameLogging::Error("User chose to terminate execution.");
+                    ExitProcess(1);
+                } else {
+                    GameLogging::Info("User chose to continue execution despite PIA failure.");
+                }
+            }
+        }
+
     };
 
 }

@@ -73,7 +73,7 @@ export async function getSkuDetails(
     const refreshedToken = await jwtClient.refreshAccessToken();
     const newtoken = refreshedToken.credentials.access_token;
     // functions.logger.debug('refreshedToken data: ' + refreshedToken.res?.data); // undefined
-    functions.logger.debug('refreshedToken: ' + newtoken);
+    // functions.logger.debug('refreshedToken: ' + newtoken);
 
     // const result = await google.auth.request({
     //   url: szUrl,
@@ -87,7 +87,7 @@ export async function getSkuDetails(
         Authorization: `Bearer ${newtoken}`,
       },
     };
-    functions.logger.debug(config);
+    // functions.logger.debug(config);
     const response = await axios.get(szUrl, config);
     const data = response.data;
     functions.logger.debug(data);
@@ -116,9 +116,9 @@ export async function testSkuDetails(userAccessToken: string, sku: string): Prom
     //     Authorization: `Bearer ${token}`,
     //   },
     // };
-    functions.logger.debug('userAccessToken: ' + userAccessToken);
-    functions.logger.debug('token: ' + token);
-    functions.logger.debug('url: ' + szUrl);
+    // functions.logger.debug('userAccessToken: ' + userAccessToken);
+    // functions.logger.debug('token: ' + token);
+    // functions.logger.debug('url: ' + szUrl);
     // functions.logger.debug(config);
 
     // const refreshedToken = await jwtClient.refreshAccessToken();
@@ -132,8 +132,8 @@ export async function testSkuDetails(userAccessToken: string, sku: string): Prom
       url: szUrl,
       method: 'GET',
     });
-    functions.logger.debug(result);
-    return result;
+    // functions.logger.debug(result);
+    return result.data;
 
     // working, but wrong token scope
     // const result = await axios.get(szUrl, config);

@@ -380,8 +380,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
-    <IncludePath>..\play_pc_sdk_25.5.818.0\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
-    <LibraryPath>..\play_pc_sdk_25.5.818.0\imports;..\vcpkg_installed\x64-windows\debug\lib;..\vcpkg_installed\x64-windows\debug\bin;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(LibraryPath)</LibraryPath>
+    <IncludePath>..\play_pc_sdk\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
+    <LibraryPath>..\play_pc_sdk\imports;..\vcpkg_installed\x64-windows\debug\lib;..\vcpkg_installed\x64-windows\debug\bin;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(LibraryPath)</LibraryPath>
     <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|x64'">
@@ -438,8 +438,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
-    <IncludePath>..\play_pc_sdk_25.5.818.0\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
-    <LibraryPath>..\play_pc_sdk_25.5.818.0\imports;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <IncludePath>..\play_pc_sdk\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
+    <LibraryPath>..\play_pc_sdk\imports;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
     <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
@@ -901,7 +901,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="..\play_pc_sdk_25.5.818.0\imports\play_pc_sdk.dll">
+    <CopyFileToFolders Include="..\play_pc_sdk\imports\play_pc_sdk.dll">
       <FileType>Document</FileType>
     </CopyFileToFolders>
     <None Include="..\vcpkg.json" />

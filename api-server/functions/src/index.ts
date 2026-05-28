@@ -27,7 +27,7 @@ import * as purchases from './purchases';
 import * as rtdn from './notifications';
 import * as tokensdb from './tokensdb';
 import * as skuDetailsApi from './skuDetailsApi';
-import { topicID } from './config';
+import { topicID, packageName } from './config';
 
 import { HttpsError } from 'firebase-functions/lib/providers/https';
 
@@ -171,6 +171,22 @@ app.get(
   },
 );
 
+app.post(
+  '/verifyIntegrityToken',
+  async (request: functions.Request, response: functions.Response) => {
+    functions.logger.info('verifyIntegrityToken', request.query);
+    functions.logger.info('body: ' + JSON.stringify(request.body));
+    const token = (request.query.token || request.body.token) + '';
+    const packageNameVal =
+      (request.query.packageName || request.body.packageName || packageName) + '';
+    functions.logger.info('token: ' + token);
+    functions.logger.info('packageName: ' + packageNameVal);
+    const result = await purchases.verifyIntegrityToken(token, packageNameVal);
+    functions.logger.info('verify result', result);
+    response.json(result);
+  },
+);
+
 app.get('/getPurchases', async (request: functions.Request, response: functions.Response) => {
   functions.logger.info('purchases', { structuredData: true });
   const userAccessToken = request.query.userAccessToken + '';
@@ -215,7 +231,7 @@ app.post('/postSkuDetails', async (request: functions.Request, response: functio
   // curl -X POST "https://dynasty-teapot-sample.web.app/api/postSkuDetails" -H 'Content-Type: application/json' -d '{"key1":"value1", "key2":"value2"}
   functions.logger.debug('body: ' + JSON.stringify(request.body)); // body: {"key1":"value1", "key2":"value2"}
   const userAccessToken = request.body.userAccessToken;
-  functions.logger.debug('userAccessToken: ' + userAccessToken);
+  // functions.logger.debug('userAccessToken: ' + userAccessToken);
   const result = await skuDetailsApi.testSkuDetails(userAccessToken, 'iap_dynasty_89');
   response.json({
     hello: result,

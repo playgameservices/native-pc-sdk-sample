@@ -195,6 +195,9 @@ namespace GameApplication {
         case HttpOps::ConsumePurchases:
             PostConsumePurchase();
             break;
+        case HttpOps::VerifyIntegrityToken:
+            PostVerifyIntegrityToken();
+            break;
         default:
             break;
         }
@@ -266,6 +269,13 @@ namespace GameApplication {
             SetValueForKey("packageName", appSettingFiles->mPackageName);
             SetValueForKey("token", appSettingFiles->mPurchaseToken);
             SetValueForKey("productId", appSettingFiles->mSku);
+            txtBuiltUrl->Text = UpdateUrl();
+        }
+        break;
+        case HttpOps::VerifyIntegrityToken:
+        {
+            SetValueForKey("packageName", appSettingFiles->mPackageName);
+            SetValueForKey("token", txtAccessToken->Text); // Using txtAccessToken as placeholder
             txtBuiltUrl->Text = UpdateUrl();
         }
         break;
@@ -538,6 +548,34 @@ namespace GameApplication {
         txtResult->Text = readData;
     }
 
+
+    /*
+     * httpclient server to PostVerifyIntegrityToken call
+    */
+    void GameApplication::PostVerifyIntegrityToken()
+    {
+        String^ url = txtBuiltUrl->Text;
+        Console::WriteLine("PostVerifyIntegrityToken\nurl :{0} ", url);
+        HttpClient^ client = gcnew HttpClient();
+        
+        HttpRequestMessage^ requestMessage = gcnew HttpRequestMessage(HttpMethod::Post, url);
+        requestMessage->Content = gcnew StringContent("", Encoding::UTF8, "application/json");
+        
+        Task<HttpResponseMessage^>^ responseTask = client->SendAsync(requestMessage);
+        HttpResponseMessage^ response = responseTask->Result;
+
+        if (!response->IsSuccessStatusCode) {
+            String^ errorStatus = String::Format("HTTP Error: {0}", response);
+            txtResult->Text = errorStatus;
+            Console::WriteLine(errorStatus);
+            return;
+        }
+        Task<String^>^ readTask = response->Content->ReadAsStringAsync();
+        readTask->Wait();
+        String^ readData = readTask->Result;
+        Console::WriteLine("Return data: {0}", readData);
+        txtResult->Text = readData;
+    }
 
     int GameApplication::SetValueForKey(String^ key, String^ value)
     {

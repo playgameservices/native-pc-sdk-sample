@@ -2,7 +2,7 @@
 // Microsoft Visual C++ generated include file.
 // Used by GameApplication.rc
 //
-#define NUM_LIST_ITEMS                  7
+#define NUM_LIST_ITEMS                  10
 #define IDI_ICON1                       101
 #define IDD_SDK                         107
 //#define IDOK                            1004
