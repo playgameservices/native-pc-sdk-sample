@@ -19,10 +19,9 @@
  */
 
 // service account credentials
-export const serviceAccountEmail =
-  '';
+export const serviceAccountEmail = '<project-number>-compute@developer.gserviceaccount.com';
 export const serviceAccountPrivateKey =
-  '';
+  '-----BEGIN PRIVATE KEY-----\nMy private key\n-----END PRIVATE KEY-----\n';
 
 // app package name
 export const packageName = 'com.dynasty.pconlygame';
