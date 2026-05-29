@@ -261,9 +261,14 @@ namespace GameApp {
         void GetComboBoxText(HWND combo, int& index, string& ret) {
             index = (int)SendMessage(combo, CB_GETCURSEL, 0, 0);
             if (index != CB_ERR) {
-                TCHAR text[256];
-                SendMessage(combo, CB_GETLBTEXT, index, (LPARAM)text);
-                std::wstring wstr(text);
+                // CB_GETLBTEXT does NOT truncate. Purchase/offer tokens can
+                // exceed 255 chars, so size the buffer based on value from
+                // CB_GETLBTEXTLEN.
+                LRESULT len = SendMessage(combo, CB_GETLBTEXTLEN, index, 0);
+                if (len == CB_ERR) return;
+                std::wstring wstr(static_cast<size_t>(len) + 1, L'\0');
+                SendMessage(combo, CB_GETLBTEXT, index, (LPARAM)wstr.data());
+                wstr.resize(static_cast<size_t>(len));
                 ret = wstringTostring(wstr);
             }
         }
