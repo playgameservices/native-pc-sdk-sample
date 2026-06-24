@@ -1,7 +1,7 @@
 # **Guide: Creating a Sample Game with the Play PC SDK Unity Package v1.0** 
 
-**Author**: [Milan Pandey](mailto:mipandey@google.com) [Hakim Hauston](mailto:hakimh@google.com)  
-**Last updated**: Nov 19, 2025
+**Author**: [Milan Pandey](mailto:mipandey@google.com), [Hakim Hauston](mailto:hakimh@google.com), [Sota Shimizu](mailto:sotash@google.com) 
+**Last updated**: June 24, 2026
 
 ## **Introduction**
 
@@ -12,11 +12,7 @@ This new version of the wrapper features a decoupled, modern architecture that s
 * **Factory-Based Clients:** Instead of new BillingClient(), you now use the factory to get a pre-configured instance: PlayPcSdkFactory.CreateBillingClient(). This is safer and hides implementation details.  
 * **Result Pattern (No Exceptions):** Asynchronous methods no longer throw SdkException for API errors. Instead, they return a Result object. You must now check result.IsOk to handle success and failure cases, which mirrors the C++ SDK experience.
 
-**Unity Package download URL:** [PlayPcSdkManaged\_25.11.345.0.unitypackage](https://drive.google.com/file/d/1a5JfdniJosRMYnJvGbwihrP739_eXl4B/view?usp=sharing) 
-
-### **Key Usage Changes from Prior Versions:**
-
-* 
+**Unity Package download URL:** [Integrate Google Play Games PC SDK with Unity](https://developer.android.com/games/playgames/native-pc/unity/unity_start) 
 
 ## **Step 1: Create a New Unity Project**
 
@@ -28,10 +24,9 @@ This new version of the wrapper features a decoupled, modern architecture that s
 
 ## **Step 2: Import the SDK Package**
 
-1. Locate the PlayPcSdk.unitypackage file.  
-2. Drag and drop this file directly into the **Assets** area of the Unity Editor's Project window.  
-3. The "Import Unity Package" window will appear. Leave everything checked and click **Import**.  
-4. The SDK is now installed. You will find it correctly structured in the Assets/Plugins/PlayPcSdkManaged folder.
+1. Open Package Manager on the Unity Editor.
+2. Install the downloaded play_pc_sdk_unity_x.x.x.tgz package using "Install package from tarball..." .
+3. Confirm the Google Play PC SDK folder is created in the Packages folder.
 
 ## **Step 3: Create the Game Scene and UI**
 

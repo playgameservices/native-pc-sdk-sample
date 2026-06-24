@@ -63,7 +63,8 @@ public class GameStoreManager : MonoBehaviour
             Log("<color=green>Successfully connected to the store!</color>");
 
             // Use the factory to get Unity-compatible instances of the clients
-            _billingClient = PlayPcSdkFactory.CreateBillingClient();
+            var clientParams = new BillingClientParams { EnablePendingPurchases = true };
+            _billingClient = PlayPcSdkFactory.CreateBillingClient(clientParams);
             _integrityClient = PlayPcSdkFactory.CreateIntegrityClient();
 
             // Enable the next steps
