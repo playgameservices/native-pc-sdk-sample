@@ -273,6 +273,9 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
+    <IncludePath>..\play_pc_sdk\includes;..\vcpkg_installed\x86-windows\include;..\vcpkg_installed\x64-windows\include;$(IncludePath)</IncludePath>
+    <LibraryPath>..\play_pc_sdk\imports\x86;..\play_pc_sdk\imports;..\vcpkg_installed\x86-windows\debug\lib;..\vcpkg_installed\x86-windows\debug\bin;..\vcpkg_installed\x86-windows\lib;..\vcpkg_installed\x86-windows\bin;$(LibraryPath)</LibraryPath>
+    <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -312,6 +315,9 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
+    <IncludePath>..\play_pc_sdk\includes;..\vcpkg_installed\x86-windows\include;..\vcpkg_installed\x64-windows\include;$(IncludePath)</IncludePath>
+    <LibraryPath>..\play_pc_sdk\imports\x86;..\play_pc_sdk\imports;..\vcpkg_installed\x86-windows\lib;..\vcpkg_installed\x86-windows\bin;$(LibraryPath)</LibraryPath>
+    <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-x86_64'">
     <LinkIncremental>false</LinkIncremental>
@@ -334,13 +340,15 @@
       <PreprocessorDefinitions>WIN32;_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\vcpkg_installed\x86-windows\include;..\vcpkg_installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Win32'">
@@ -389,7 +397,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-x86_64'">
@@ -442,7 +451,8 @@
       <AdditionalDependencies>$(VS_NdkRoot)toolchains\llvm\prebuilt\windows-x86_64\sysroot\usr\lib\$(AndroidTargetArchToolPrefix)-linux-android$(AndroidToolchainSuffix)\libc++_shared.so</AdditionalDependencies>
     </Link>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-arm64-v8a'">
@@ -545,6 +555,7 @@
       <PreprocessorDefinitions>WIN32;NDEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
+      <AdditionalIncludeDirectories>..\vcpkg_installed\x86-windows\include;..\vcpkg_installed\x64-windows\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -553,7 +564,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-x86_64'">
@@ -576,7 +588,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-arm64-v8a'">
@@ -599,7 +612,8 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">

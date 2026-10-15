@@ -541,7 +541,7 @@ namespace GameApp {
                 if (!createBillingReport.ok()) {
                     m_bCanMoveToStage = false;
                     message << "\rWarning CreateBillingProgramReportingDetails with option:" << GetBillingProgram(nProgID) ;
-                    message << "\r\nt error_message: " << sdkErrorMsg[(BillingError)createBillingReport.code()] <<" error message " << createBillingReport.Error;
+                    message << "\r\nt error_message: " << sdkErrorMsg[(BillingError)createBillingReport.code()] <<" error message " << createBillingReport.error_message();
                     SetWindowText(hResult, stringToWstring(message.str()).c_str());
                     GameLogging::Error(message.str());
                 }
@@ -688,7 +688,7 @@ namespace GameApp {
                 mLaunchPurchaseFlowResValue = launchPurchaseFlowResult.value();
                 stringstream mess;
                 m_bCanMoveToStage = true;
-                mess << "Successfully completed launch purchase flow purchase" << endl;
+                mess << "Successfully completed launch purchase flow purchase" << std::endl;
                 mess << "\r\nThe purchase token is: " << mLaunchPurchaseFlowResValue.product_purchase_details.purchase_token;
                 GameLogging::Info(mess.str());
                 SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
@@ -743,7 +743,7 @@ namespace GameApp {
                 mAcknowledgePurchaseResultValue = acknowledgePurchaseResult.value();
                 stringstream mess;
                 m_bCanMoveToStage = true;
-                mess << "Successfully completed launch purchase flow purchase" << endl;
+                mess << "Successfully completed launch purchase flow purchase" << std::endl;
                 GameLogging::Info(mess.str());
                 SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
                 SetForegroundWindow(m_hWnd);
@@ -795,7 +795,7 @@ namespace GameApp {
                 mConsumePurchaseResultValue = consumePurchaseResult.value();
                 stringstream mess;
 
-                mess << "Successfully completed consume purchase flow Done." << endl;
+                mess << "Successfully completed consume purchase flow Done." << std::endl;
                 GameLogging::Info(mess.str());
                 SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
                 SetForegroundWindow(m_hWnd);

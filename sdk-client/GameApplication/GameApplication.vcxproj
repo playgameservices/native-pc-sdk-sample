@@ -272,9 +272,9 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <LinkIncremental>true</LinkIncremental>
     <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
-    <IncludePath>..\play_pc_sdk_v0.9.0\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
-    <LibraryPath>..\play_pc_sdk_v0.9.0\imports;..\vcpkg_installed\x64-windows\debug\lib;..\vcpkg_installed\x64-windows\debug\bin;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;</LibraryPath>
-    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+    <IncludePath>..\play_pc_sdk\includes;..\vcpkg_installed\x86-windows\include;..\vcpkg_installed\x64-windows\include;$(IncludePath)</IncludePath>
+    <LibraryPath>..\play_pc_sdk\imports\x86;..\play_pc_sdk\imports;..\vcpkg_installed\x86-windows\debug\lib;..\vcpkg_installed\x86-windows\debug\bin;..\vcpkg_installed\x86-windows\lib;..\vcpkg_installed\x86-windows\bin;$(LibraryPath)</LibraryPath>
+    <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Win32'">
     <LinkIncremental>true</LinkIncremental>
@@ -380,8 +380,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
     <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
-    <IncludePath>..\play_pc_sdk\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
-    <LibraryPath>..\play_pc_sdk\imports;..\vcpkg_installed\x64-windows\debug\lib;..\vcpkg_installed\x64-windows\debug\bin;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(LibraryPath)</LibraryPath>
+    <IncludePath>..\play_pc_sdk\includes;..\vcpkg_installed\x64-windows\include;..\vcpkg_installed\x86-windows\include;$(IncludePath)</IncludePath>
+    <LibraryPath>..\play_pc_sdk\imports\x64;..\play_pc_sdk\imports;..\vcpkg_installed\x64-windows\debug\lib;..\vcpkg_installed\x64-windows\debug\bin;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(LibraryPath)</LibraryPath>
     <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Asan|x64'">
@@ -399,9 +399,9 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
     <LinkIncremental>false</LinkIncremental>
     <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
-    <IncludePath>\Libraries\play_pc_sdk_v0.9.0\includes;\vcpkg\installed\x64-windows\include</IncludePath>
-    <LibraryPath>\Libraries\play_pc_sdk_v0.9.0\imports;\vcpkg\installed\x64-windows\debug\lib;\vcpkg\installed\x64-windows\debug\bin;\vcpkg\installed\x64-windows\lib;\vcpkg\installed\x64-windows\bin;</LibraryPath>
-    <PreBuildEventUseInBuild>true</PreBuildEventUseInBuild>
+    <IncludePath>..\play_pc_sdk\includes;..\vcpkg_installed\x86-windows\include;..\vcpkg_installed\x64-windows\include;$(IncludePath)</IncludePath>
+    <LibraryPath>..\play_pc_sdk\imports\x86;..\play_pc_sdk\imports;..\vcpkg_installed\x86-windows\lib;..\vcpkg_installed\x86-windows\bin;$(LibraryPath)</LibraryPath>
+    <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-x86_64'">
     <LinkIncremental>false</LinkIncremental>
@@ -438,8 +438,8 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <AndroidDebugComponent>com.example.gameapplication/.MainActivity</AndroidDebugComponent>
-    <IncludePath>..\play_pc_sdk\includes;..\vcpkg_installed\x64-windows\include</IncludePath>
-    <LibraryPath>..\play_pc_sdk\imports;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
+    <IncludePath>..\play_pc_sdk\includes;..\vcpkg_installed\x64-windows\include;..\vcpkg_installed\x86-windows\include;$(IncludePath)</IncludePath>
+    <LibraryPath>..\play_pc_sdk\imports\x64;..\play_pc_sdk\imports;..\vcpkg_installed\x64-windows\lib;..\vcpkg_installed\x64-windows\bin;$(VC_LibraryPath_x64);$(WindowsSDK_LibraryPath_x64)</LibraryPath>
     <PreBuildEventUseInBuild>false</PreBuildEventUseInBuild>
   </PropertyGroup>
   <PropertyGroup Label="Vcpkg">
@@ -455,6 +455,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -466,7 +467,8 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Win32'">
@@ -534,7 +536,8 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-x86_64'">
@@ -610,7 +613,8 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Asan|Android-arm64-v8a'">
@@ -667,7 +671,7 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_CONSOLE;%(PreprocessorDefinitions);WIN32_LEAN_AND_MEAN;</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
@@ -750,6 +754,7 @@
       <ConformanceMode>true</ConformanceMode>
       <PrecompiledHeaderFile>pch.h</PrecompiledHeaderFile>
       <AdditionalIncludeDirectories>..\GameEngine</AdditionalIncludeDirectories>
+      <LanguageStandard>stdcpp20</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -763,7 +768,8 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-x86_64'">
@@ -795,7 +801,8 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Android-arm64-v8a'">
@@ -826,7 +833,8 @@
       </Command>
     </PostBuildEvent>
     <PreBuildEvent>
-      <Command>vcpkg install</Command>
+      <Command>
+      </Command>
     </PreBuildEvent>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -901,38 +909,36 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="..\play_pc_sdk\imports\play_pc_sdk.dll">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
+    <!-- If x86 / Win32 is selected: prefer imports\x86, fallback to imports\ -->
+    <CopyFileToFolders Condition="'$(Platform)'=='Win32' and Exists('..\play_pc_sdk\imports\x86\play_pc_sdk.dll')" Include="..\play_pc_sdk\imports\x86\play_pc_sdk.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'=='Win32' and !Exists('..\play_pc_sdk\imports\x86\play_pc_sdk.dll') and Exists('..\play_pc_sdk\imports\play_pc_sdk.dll')" Include="..\play_pc_sdk\imports\play_pc_sdk.dll" />
+
+    <!-- Otherwise (default x64): prefer imports\x64, fallback to imports\ -->
+    <CopyFileToFolders Condition="'$(Platform)'!='Win32' and Exists('..\play_pc_sdk\imports\x64\play_pc_sdk.dll')" Include="..\play_pc_sdk\imports\x64\play_pc_sdk.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'!='Win32' and !Exists('..\play_pc_sdk\imports\x64\play_pc_sdk.dll') and Exists('..\play_pc_sdk\imports\play_pc_sdk.dll')" Include="..\play_pc_sdk\imports\play_pc_sdk.dll" />
     <None Include="..\vcpkg.json" />
-    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\bin\tinyxml2.dll">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\debug\bin\freeglutd.dll">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\debug\bin\glew32d.dll">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\debug\bin\libcurl-d.dll">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\debug\bin\zlibd1.dll">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\bin\freeglut.dll">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\bin\glew32.dll">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\bin\libcurl.dll">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <CopyFileToFolders Include="..\vcpkg_installed\x64-windows\bin\zlib1.dll">
-      <FileType>Document</FileType>
-    </CopyFileToFolders>
-    <None Include="AppConfig.json" />
+    <!-- vcpkg runtime DLLs for Win32 (x86) -->
+    <CopyFileToFolders Condition="'$(Platform)'=='Win32' and Exists('..\vcpkg_installed\x86-windows\debug\bin\glew32d.dll')" Include="..\vcpkg_installed\x86-windows\debug\bin\glew32d.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'=='Win32' and Exists('..\vcpkg_installed\x86-windows\debug\bin\freeglutd.dll')" Include="..\vcpkg_installed\x86-windows\debug\bin\freeglutd.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'=='Win32' and Exists('..\vcpkg_installed\x86-windows\debug\bin\libcurl-d.dll')" Include="..\vcpkg_installed\x86-windows\debug\bin\libcurl-d.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'=='Win32' and Exists('..\vcpkg_installed\x86-windows\debug\bin\zlibd1.dll')" Include="..\vcpkg_installed\x86-windows\debug\bin\zlibd1.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'=='Win32' and Exists('..\vcpkg_installed\x86-windows\bin\tinyxml2.dll')" Include="..\vcpkg_installed\x86-windows\bin\tinyxml2.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'=='Win32' and Exists('..\vcpkg_installed\x86-windows\bin\glew32.dll')" Include="..\vcpkg_installed\x86-windows\bin\glew32.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'=='Win32' and Exists('..\vcpkg_installed\x86-windows\bin\freeglut.dll')" Include="..\vcpkg_installed\x86-windows\bin\freeglut.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'=='Win32' and Exists('..\vcpkg_installed\x86-windows\bin\libcurl.dll')" Include="..\vcpkg_installed\x86-windows\bin\libcurl.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'=='Win32' and Exists('..\vcpkg_installed\x86-windows\bin\zlib1.dll')" Include="..\vcpkg_installed\x86-windows\bin\zlib1.dll" />
+
+    <!-- vcpkg runtime DLLs for x64 -->
+    <CopyFileToFolders Condition="'$(Platform)'!='Win32' and Exists('..\vcpkg_installed\x64-windows\debug\bin\glew32d.dll')" Include="..\vcpkg_installed\x64-windows\debug\bin\glew32d.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'!='Win32' and Exists('..\vcpkg_installed\x64-windows\debug\bin\freeglutd.dll')" Include="..\vcpkg_installed\x64-windows\debug\bin\freeglutd.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'!='Win32' and Exists('..\vcpkg_installed\x64-windows\debug\bin\libcurl-d.dll')" Include="..\vcpkg_installed\x64-windows\debug\bin\libcurl-d.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'!='Win32' and Exists('..\vcpkg_installed\x64-windows\debug\bin\zlibd1.dll')" Include="..\vcpkg_installed\x64-windows\debug\bin\zlibd1.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'!='Win32' and Exists('..\vcpkg_installed\x64-windows\bin\tinyxml2.dll')" Include="..\vcpkg_installed\x64-windows\bin\tinyxml2.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'!='Win32' and Exists('..\vcpkg_installed\x64-windows\bin\glew32.dll')" Include="..\vcpkg_installed\x64-windows\bin\glew32.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'!='Win32' and Exists('..\vcpkg_installed\x64-windows\bin\freeglut.dll')" Include="..\vcpkg_installed\x64-windows\bin\freeglut.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'!='Win32' and Exists('..\vcpkg_installed\x64-windows\bin\libcurl.dll')" Include="..\vcpkg_installed\x64-windows\bin\libcurl.dll" />
+    <CopyFileToFolders Condition="'$(Platform)'!='Win32' and Exists('..\vcpkg_installed\x64-windows\bin\zlib1.dll')" Include="..\vcpkg_installed\x64-windows\bin\zlib1.dll" />
+    <CopyFileToFolders Include="AppConfig.json" />
     <CopyFileToFolders Include="LegacyGameApis.json">
       <FileType>Document</FileType>
     </CopyFileToFolders>
@@ -943,7 +949,9 @@
     <None Include="userToken.json" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\ShaderPlain.fsh" />
+    <CopyFileToFolders Include="Shaders\ShaderPlain.fsh">
+      <DestinationFolders>$(OutDir)Shaders\</DestinationFolders>
+    </CopyFileToFolders>
     <None Include="src\main\assets\Shaders\ShaderPlain.fsh" />
   </ItemGroup>
   <ItemGroup>
@@ -956,7 +964,9 @@
     <Xml Include="src\main\AndroidManifest.xml" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Shaders\VS_ShaderPlain.vsh" />
+    <CopyFileToFolders Include="Shaders\VS_ShaderPlain.vsh">
+      <DestinationFolders>$(OutDir)Shaders\</DestinationFolders>
+    </CopyFileToFolders>
     <None Include="src\main\assets\Shaders\VS_ShaderPlain.vsh" />
   </ItemGroup>
   <ItemGroup>
