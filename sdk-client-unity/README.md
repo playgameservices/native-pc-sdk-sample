@@ -36,11 +36,15 @@ We'll build a simple UI to interact with the SDK.
 2. **Add UI Elements**: Inside the Canvas, create the following:  
    * **Text (TextMeshPro)** for a title ("Game Store").  
    * **Text (TextMeshPro)** for logging output. Anchor it to fill the bottom half of the screen.  
-   * Five **Button (TextMeshPro)** elements. Name and label them:  
+   * Nine **Button (TextMeshPro)** elements (the 4 Cloud Save buttons are also auto-created at runtime if left unassigned). Name and label them:  
      * InitializeButton \-\> "Connect to Store"  
      * IntegrityButton \-\> "Check Integrity"  
      * QueryProductsButton \-\> "Load Products"  
      * PurchaseButton \-\> "Buy Item"  
+     * ListSnapshotsButton \-\> "List Snapshots"  
+     * OpenSnapshotButton \-\> "Open Snapshot"  
+     * CommitSnapshotButton \-\> "Commit Snapshot"  
+     * DeleteSnapshotButton \-\> "Delete Snapshot"  
      * ExitButton \-\> "Exit Game"
 
 ## **Step 4: Write the Game Logic Script**
