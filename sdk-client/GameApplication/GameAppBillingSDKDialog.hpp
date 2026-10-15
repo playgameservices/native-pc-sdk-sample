@@ -14,6 +14,7 @@
 #include <format>
 #include <billing/models.h>
 #include <future>
+#include <memory>
 #include <restclient-cpp/restclient.h>
 using namespace google::play::initialization;
 using namespace google::play::billing;
@@ -64,7 +65,24 @@ namespace GameApp {
             appEvents[BillingOps::kVerifyIntegrityToken].onClick = bind(&GameAppBillingSdkDialog::OnClickVerifyIntegrityToken, this, std::placeholders::_1);
         }
 
-        ~GameAppBillingSdkDialog() {}
+        ~GameAppBillingSdkDialog() {
+            if (mBillingClient) {
+                delete mBillingClient;
+                mBillingClient = nullptr;
+            }
+            if (mIntegrityClient) {
+                delete mIntegrityClient;
+                mIntegrityClient = nullptr;
+            }
+            if (mPrepareIntegrityTokenResValue) {
+                delete mPrepareIntegrityTokenResValue;
+                mPrepareIntegrityTokenResValue = nullptr;
+            }
+            if (mRequestIntegrityTokenResValue) {
+                delete mRequestIntegrityTokenResValue;
+                mRequestIntegrityTokenResValue = nullptr;
+            }
+        }
 
         // This function shows the dialog box
         void ShowDialog() {
@@ -89,19 +107,14 @@ namespace GameApp {
         // Billing SDK
         BillingClient* mBillingClient = nullptr;
         ProductId mProductid;
-        QueryProductDetailsResult* mQueryProductDetailsResult;
         QueryProductDetailsResultValue mQueryPrudResValue;
-        LaunchPurchaseFlowResult* mLaunchPurchaseFlowResult;
         LaunchPurchaseFlowResultValue mLaunchPurchaseFlowResValue;
-        AcknowledgePurchaseResult* mAcknowledgePurchaseResult;
         AcknowledgePurchaseResultValue mAcknowledgePurchaseResultValue;
-        ConsumePurchaseResult* mConsumePurchaseResult;
         ConsumePurchaseResultValue mConsumePurchaseResultValue;
-        IsBillingProgramAvailableResult* mIsBillingProgramAvailableResult;
         IsBillingProgramAvailableResultValue mIsBillingProgramAvailableResultValue;
 
         // Play Integrity API
-		IntegrityClient* mIntegrityClient = nullptr;
+        IntegrityClient* mIntegrityClient = nullptr;
         PrepareIntegrityTokenResultValue* mPrepareIntegrityTokenResValue = nullptr;
         RequestIntegrityTokenResultValue* mRequestIntegrityTokenResValue = nullptr;
         std::string mCachedRequestHash;
@@ -163,9 +176,9 @@ namespace GameApp {
                         SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)ListBoxItems[i].c_str());
                     }
                     pThis->OnInitDialog(hwndDlg);
-                    }
                 }
-                return TRUE;
+            }
+                              return TRUE;
 
             case WM_COMMAND: {
                 WORD notificationCode = HIWORD(wParam);
@@ -185,7 +198,7 @@ namespace GameApp {
                     }
                 }
             }
-            break;
+                           break;
             case WM_CLOSE:
                 EndDialog(hwndDlg, 0);
                 return TRUE;
@@ -438,7 +451,7 @@ namespace GameApp {
                 }
                 m_bCanMoveToStage = true;
                 BillingClientParams params;
-				params.enable_pending_purchases = true;
+                params.enable_pending_purchases = true;
                 win->mBillingClient = new BillingClient(params);
                 message = L"SDK Initialization completed successfully. \r\nBilling client created.";
                 GameLogging::Info(wstringTostring(message.c_str()));
@@ -450,46 +463,42 @@ namespace GameApp {
             }
         }
 
-		string GetBillingProgram(int nProgID) {
-			switch (nProgID) {
-			case 1:
+        string GetBillingProgram(int nProgID) {
+            switch (nProgID) {
+            case 1:
                 return "1 - kBillingProgramAlternativeBillingOnly";
-			case 2:
+            case 2:
                 return "2 - kBillingProgramUserChoice";
-			default:
+            default:
                 return "Unknown billing program";
-			}
-		}
+            }
+        }
 
         void OnClickIsBillingProgramAvailable(void* ptr)
         {
             GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-			if (win->mBillingClient == nullptr) {
-				string mess = "Error - SDK not initialized";
-				GameLogging::Info(mess);
-				SetWindowText(hResult, stringToWstring(mess).c_str());
-				return;
-			}
+            if (win->mBillingClient == nullptr) {
+                string mess = "Error - SDK not initialized";
+                GameLogging::Info(mess);
+                SetWindowText(hResult, stringToWstring(mess).c_str());
+                return;
+            }
 
             stringstream message;
             SetWindowText(win->hResult, L"IsBillingProgramAvailable initialized");
             try {
-                std::atomic_bool bIsBillingProgramAvailableDone = false;
                 IsBillingProgramAvailableParams param;
                 int nProgID;
                 string sProgID;
                 GetComboBoxText(hComboBox1, nProgID, sProgID);
                 param.billing_program = (BillingProgram)nProgID;
-                IsBillingProgramAvailableResult billingProgramAvailableResult(
-                    google::play::billing::BillingError::kError, "unset");
+                auto promise = std::make_shared<std::promise<IsBillingProgramAvailableResult>>();
                 win->mBillingClient->IsBillingProgramAvailable(
-                    param, [&bIsBillingProgramAvailableDone,
-                    &billingProgramAvailableResult](IsBillingProgramAvailableResult r) {
-                        billingProgramAvailableResult = std::move(r);
-                        bIsBillingProgramAvailableDone = true;
+                    param, [promise](IsBillingProgramAvailableResult r) {
+                        promise->set_value(std::move(r));
                     }
                 );
-                Sleep(100);
+                auto billingProgramAvailableResult = promise->get_future().get();
                 if (!billingProgramAvailableResult.ok()) {
                     message << "\rWarning in IsBillingProgramAvailable: with billing program option:" << GetBillingProgram(nProgID) << "\r\nError:" << billingProgramAvailableResult.error_message();
                     message << "\r\n\t error_message: " << sdkErrorMsg[(BillingError)billingProgramAvailableResult.code()];;
@@ -523,25 +532,21 @@ namespace GameApp {
             SetWindowText(win->hResult, L"CreateBillingProgramReportingDetails initialized");
             try {
                 //message << "product id: " << mProductid.id << " product type: " << mProductid.product_type;
-                std::atomic_bool bCreateBillingProgramDone = false;
                 CreateBillingProgramReportingDetailsParams params;
                 int nProgID;
                 string sProgID;
                 GetComboBoxText(hComboBox1, nProgID, sProgID);
                 params.billing_program = (BillingProgram)nProgID;
-                CreateBillingProgramReportingDetailsResult createBillingReport(
-                    google::play::billing::BillingError::kError, "unset");
+                auto promise = std::make_shared<std::promise<CreateBillingProgramReportingDetailsResult>>();
                 win->mBillingClient->CreateBillingProgramReportingDetails(
-                    params, [&bCreateBillingProgramDone, &createBillingReport]
-                    (CreateBillingProgramReportingDetailsResult r) {
-                        createBillingReport = std::move(r);
-                        bCreateBillingProgramDone = true;
+                    params, [promise](CreateBillingProgramReportingDetailsResult r) {
+                        promise->set_value(std::move(r));
                     });
-                Sleep(100);
+                auto createBillingReport = promise->get_future().get();
                 if (!createBillingReport.ok()) {
                     m_bCanMoveToStage = false;
-                    message << "\rWarning CreateBillingProgramReportingDetails with option:" << GetBillingProgram(nProgID) ;
-                    message << "\r\nt error_message: " << sdkErrorMsg[(BillingError)createBillingReport.code()] <<" error message " << createBillingReport.error_message();
+                    message << "\rWarning CreateBillingProgramReportingDetails with option:" << GetBillingProgram(nProgID);
+                    message << "\r\nt error_message: " << sdkErrorMsg[(BillingError)createBillingReport.code()] << " error message " << createBillingReport.error_message();
                     SetWindowText(hResult, stringToWstring(message.str()).c_str());
                     GameLogging::Error(message.str());
                 }
@@ -580,19 +585,12 @@ namespace GameApp {
             mProductid.product_type = (ProductType)nProdType;
             param.product_ids.push_back(mProductid);
             GameLogging::Info(message.str());
-            std::atomic_bool queryProductDetailsDone = false;
-            QueryProductDetailsResult queryProductDetailsResult(
-                google::play::billing::BillingError::kError, "unset");
+            auto promise = std::make_shared<std::promise<QueryProductDetailsResult>>();
             ((BillingClient*)win->mBillingClient)->QueryProductDetails(
-                param, [&queryProductDetailsDone,
-                &queryProductDetailsResult](QueryProductDetailsResult r) {
-                    queryProductDetailsResult = std::move(r);
-                    queryProductDetailsDone = true;
+                param, [promise](QueryProductDetailsResult r) {
+                    promise->set_value(std::move(r));
                 });
-
-            while (!queryProductDetailsDone) {
-                Sleep(1000);
-            }
+            auto queryProductDetailsResult = promise->get_future().get();
             if (!queryProductDetailsResult.ok()) {
                 int code = (int)queryProductDetailsResult.code();
                 stringstream message;
@@ -628,10 +626,9 @@ namespace GameApp {
                     string currency = offer.currency_code;
                     string formatedPrice = offer.formatted_price;
                     string offer = std::format("\r\n\tOffer: {} {}", doubleString, currency);
-                    messProd << offer<<"\r\n\tformatted_price: "<< formatedPrice;
+                    messProd << offer << "\r\n\tformatted_price: " << formatedPrice;
                 }
             }
-            mQueryProductDetailsResult = &queryProductDetailsResult;
             mQueryPrudResValue = queryProductDetailsResultValue;
             SetWindowText(win->hResult, stringToWstring(messProd.str()).c_str());
             GameLogging::Info(messProd.str());
@@ -649,27 +646,18 @@ namespace GameApp {
                 return;
             }
             GameLogging::Info("Launch Purchase Flow");
-            const auto& queryProductDetailsResultValue = mQueryProductDetailsResult->value();
             int nOfferToken;
             string sOfferToken;
             GetComboBoxText(hComboBox1, nOfferToken, sOfferToken);
             string off = mQueryPrudResValue.product_details[0].product_offers[0].offer_token;
             ProductOffer offer_token;
             LaunchPurchaseFlowParams purchaseFlowParams = { sOfferToken,"","" };
-            std::atomic_bool launchPurchaseFlowDone = false;
-            LaunchPurchaseFlowResult launchPurchaseFlowResult(
-                BillingError::kError, "unset");
+            auto promise = std::make_shared<std::promise<LaunchPurchaseFlowResult>>();
             win->mBillingClient->LaunchPurchaseFlow(
-                purchaseFlowParams, [&launchPurchaseFlowDone, &launchPurchaseFlowResult](
-                    LaunchPurchaseFlowResult r) {
-                        launchPurchaseFlowResult = std::move(r);
-                        launchPurchaseFlowDone = true;
+                purchaseFlowParams, [promise](LaunchPurchaseFlowResult r) {
+                    promise->set_value(std::move(r));
                 });
-            mLaunchPurchaseFlowResult = &launchPurchaseFlowResult;
-            while (!launchPurchaseFlowDone) {
-                Sleep(1000);
-            }
-            Sleep(5000);
+            auto launchPurchaseFlowResult = promise->get_future().get();
 
             if (!launchPurchaseFlowResult.ok()) {
                 m_bCanMoveToStage = false;
@@ -688,7 +676,7 @@ namespace GameApp {
                 mLaunchPurchaseFlowResValue = launchPurchaseFlowResult.value();
                 stringstream mess;
                 m_bCanMoveToStage = true;
-                mess << "Successfully completed launch purchase flow purchase" << std::endl;
+                mess << "Successfully completed launch purchase flow purchase" << endl;
                 mess << "\r\nThe purchase token is: " << mLaunchPurchaseFlowResValue.product_purchase_details.purchase_token;
                 GameLogging::Info(mess.str());
                 SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
@@ -711,20 +699,12 @@ namespace GameApp {
             AcknowledgePurchaseParams ackonwledgeParam{
                 sPurchaseTokenId
             };
-            std::atomic_bool acknowledgeDone = false;
-            AcknowledgePurchaseResult acknowledgePurchaseResult(
-                BillingError::kError, "unset");
-            win->mBillingClient->AcknowledgePurchase(ackonwledgeParam, 
-                [&acknowledgeDone, &acknowledgePurchaseResult](
-                AcknowledgePurchaseResult r) {
-                    acknowledgePurchaseResult = std::move(r);
-                    acknowledgeDone = true;
+            auto promise = std::make_shared<std::promise<AcknowledgePurchaseResult>>();
+            win->mBillingClient->AcknowledgePurchase(ackonwledgeParam,
+                [promise](AcknowledgePurchaseResult r) {
+                    promise->set_value(std::move(r));
                 });
-            mAcknowledgePurchaseResult = &acknowledgePurchaseResult;
-            mAcknowledgePurchaseResultValue = mAcknowledgePurchaseResult->value();
-            while (!acknowledgeDone) {
-                Sleep(1000);
-            }
+            auto acknowledgePurchaseResult = promise->get_future().get();
 
             if (!acknowledgePurchaseResult.ok()) {
                 stringstream mess;
@@ -743,7 +723,7 @@ namespace GameApp {
                 mAcknowledgePurchaseResultValue = acknowledgePurchaseResult.value();
                 stringstream mess;
                 m_bCanMoveToStage = true;
-                mess << "Successfully completed launch purchase flow purchase" << std::endl;
+                mess << "Successfully completed launch purchase flow purchase" << endl;
                 GameLogging::Info(mess.str());
                 SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
                 SetForegroundWindow(m_hWnd);
@@ -766,19 +746,12 @@ namespace GameApp {
             ConsumePurchaseParams consumePurchaseParams{
                 sPurchaseTokenId
             };
-            std::atomic_bool consumeDone = false;
-            ConsumePurchaseResult consumePurchaseResult(BillingError::kError, "unset");
-
-            win->mBillingClient->ConsumePurchase(consumePurchaseParams, [&consumeDone, &consumePurchaseResult](
-                ConsumePurchaseResult r) {
-                    consumePurchaseResult = std::move(r);
-                    consumeDone = true;
+            auto promise = std::make_shared<std::promise<ConsumePurchaseResult>>();
+            win->mBillingClient->ConsumePurchase(consumePurchaseParams,
+                [promise](ConsumePurchaseResult r) {
+                    promise->set_value(std::move(r));
                 });
-            mConsumePurchaseResult = &consumePurchaseResult;
-            mConsumePurchaseResultValue = mConsumePurchaseResult->value();
-            while (!consumeDone) {
-                Sleep(1000);
-            }
+            auto consumePurchaseResult = promise->get_future().get();
 
             if (!consumePurchaseResult.ok()) {
                 stringstream mess;
@@ -795,20 +768,20 @@ namespace GameApp {
                 mConsumePurchaseResultValue = consumePurchaseResult.value();
                 stringstream mess;
 
-                mess << "Successfully completed consume purchase flow Done." << std::endl;
+                mess << "Successfully completed consume purchase flow Done." << endl;
                 GameLogging::Info(mess.str());
                 SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
                 SetForegroundWindow(m_hWnd);
                 m_bCanMoveToStage = true;
             }
         }
-    
-		void initializeIntegrityClient() {
-			if (!mIntegrityClient) {
-				mIntegrityClient = new IntegrityClient();
-			}
-		}
-        
+
+        void initializeIntegrityClient() {
+            if (!mIntegrityClient) {
+                mIntegrityClient = new IntegrityClient();
+            }
+        }
+
         void OnSelectedPrepareIntegrityToken(void* ptr) {
             GameLogging::Info("OnSelectedPrepareIntegrityToken");
         }
@@ -820,24 +793,24 @@ namespace GameApp {
         void OnSelectedVerifyIntegrityToken(void* ptr) {
             GameLogging::Info("OnSelectedVerifyIntegrityToken");
         }
-        
+
         void OnClickPrepareIntegrityToken(void* ptr) {
             GameLogging::Info("OnClickPrepareIntegrityToken");
-            
+
             if (mIntegrityClient == nullptr) {
-				initializeIntegrityClient();
+                initializeIntegrityClient();
             }
-			
+
             PrepareIntegrityTokenParams param;
             param.cloud_project_number = 83701981335; // TODO: Replace with your Google Cloud project number
 
             std::atomic_bool done = false;
             PrepareIntegrityTokenResult* resultPtr = nullptr;
 
-			mIntegrityClient->PrepareIntegrityToken(param, [&done, &resultPtr](PrepareIntegrityTokenResult r) {
+            mIntegrityClient->PrepareIntegrityToken(param, [&done, &resultPtr](PrepareIntegrityTokenResult r) {
                 resultPtr = new PrepareIntegrityTokenResult(std::move(r));
                 done = true;
-			});
+                });
 
             while (!done) {
                 Sleep(100);
@@ -861,7 +834,7 @@ namespace GameApp {
         void OnClickRequestIntegrityToken(void* ptr) {
             GameLogging::Info("OnClickRequestIntegrityToken");
             if (mIntegrityClient == nullptr) {
-				initializeIntegrityClient();
+                initializeIntegrityClient();
             }
             if (mPrepareIntegrityTokenResValue == nullptr) {
                 GameLogging::Error("PrepareIntegrityToken must be called successfully before RequestIntegrityToken");
@@ -870,7 +843,7 @@ namespace GameApp {
             }
 
             mCachedRequestHash = std::to_string(std::time(nullptr));
-            RequestIntegrityTokenParams param {
+            RequestIntegrityTokenParams param{
                 mPrepareIntegrityTokenResValue->request_token_data,
                 mCachedRequestHash
             };
@@ -878,10 +851,10 @@ namespace GameApp {
             std::atomic_bool done = false;
             RequestIntegrityTokenResult* resultPtr = nullptr;
 
-			mIntegrityClient->RequestIntegrityToken(param, [&done, &resultPtr](RequestIntegrityTokenResult r) {
+            mIntegrityClient->RequestIntegrityToken(param, [&done, &resultPtr](RequestIntegrityTokenResult r) {
                 resultPtr = new RequestIntegrityTokenResult(std::move(r));
                 done = true;
-			});
+                });
 
             while (!done) {
                 Sleep(100);
@@ -898,7 +871,7 @@ namespace GameApp {
                 }
                 mRequestIntegrityTokenResValue = new RequestIntegrityTokenResultValue(resultPtr->value());
                 SetWindowText(hResult, L"RequestIntegrityToken completed successfully");
-                
+
                 GameLogging::Info("Token snippet: " + mRequestIntegrityTokenResValue->token_bytes.substr(0, 20) + "...");
             }
             delete resultPtr;
@@ -915,18 +888,18 @@ namespace GameApp {
             }
 
             GameLogging::Info("Token to verify: " + mRequestIntegrityTokenResValue->token_bytes);
-            
+
             try {
                 nlohmann::json jsonPayload;
                 jsonPayload["packageName"] = manifest.App.PackageName;
                 jsonPayload["token"] = mRequestIntegrityTokenResValue->token_bytes;
                 std::string payload = jsonPayload.dump();
-                
+
                 std::string url = "https://dynasty-teapot-sample.web.app/api/verifyIntegrityToken";
                 std::string content_type = "application/json";
-                
+
                 RestClient::Response response = RestClient::post(url, content_type, payload);
-                
+
                 if (response.code == 200) {
                     auto resJson = nlohmann::json::parse(response.body);
                     if (resJson.contains("result") && resJson["result"].get<bool>()) {
@@ -935,13 +908,14 @@ namespace GameApp {
                             GameLogging::Info("Hash matches and PIA returns 200 but we need to check licensing verdict");
                             std::string licensingVerdict = "";
                             try {
-                                if (resJson.contains("payload") && 
+                                if (resJson.contains("payload") &&
                                     resJson["payload"].contains("tokenPayloadExternal") &&
                                     resJson["payload"]["tokenPayloadExternal"].contains("accountDetails") &&
                                     resJson["payload"]["tokenPayloadExternal"]["accountDetails"].contains("appLicensingVerdict")) {
                                     licensingVerdict = resJson["payload"]["tokenPayloadExternal"]["accountDetails"]["appLicensingVerdict"].get<std::string>();
                                 }
-                            } catch (nlohmann::json::exception& e) {
+                            }
+                            catch (nlohmann::json::exception& e) {
                                 GameLogging::Error(std::format("Exception parsing licensing verdict: {}", e.what()));
                             }
 
@@ -949,24 +923,29 @@ namespace GameApp {
                                 GameLogging::Info("Verification successful! Hash matches and licensed.");
                                 SetWindowText(hResult, L"Verification successful! Hash matches and licensed.");
                                 bContinueExecution = true;
-                            } else if ( bAllowUnlicensed ) {
+                            }
+                            else if (bAllowUnlicensed) {
                                 GameLogging::Info("Verification successful! Hash matches but unlicensed.");
                                 SetWindowText(hResult, L"Verification successful! Hash matches but unlicensed.");
                                 bContinueExecution = true;
-                            } else {
+                            }
+                            else {
                                 GameLogging::Error("Verification failed: Unlicensed! Verdict: " + licensingVerdict);
                                 SetWindowText(hResult, stringToWstring("Verification failed: Unlicensed (" + licensingVerdict + ")").c_str());
                             }
-                        } else {
+                        }
+                        else {
                             GameLogging::Error("Verification failed: Hash mismatch! Sent: " + mCachedRequestHash + ", Received: " + receivedHash);
                             SetWindowText(hResult, stringToWstring("Verification failed: Hash mismatch!").c_str());
                         }
-                    } else {
+                    }
+                    else {
                         std::string error = resJson.contains("error") ? resJson["error"].get<std::string>() : "Unknown error";
                         GameLogging::Error("Verification failed: " + error);
                         SetWindowText(hResult, stringToWstring("Verification failed: " + error).c_str());
                     }
-                } else {
+                }
+                else {
                     GameLogging::Error("HTTP Error: " + std::to_string(response.code));
                     SetWindowText(hResult, stringToWstring("HTTP Error: " + std::to_string(response.code)).c_str());
                 }
@@ -982,7 +961,8 @@ namespace GameApp {
                 if (result == IDNO) {
                     GameLogging::Error("User chose to terminate execution.");
                     ExitProcess(1);
-                } else {
+                }
+                else {
                     GameLogging::Info("User chose to continue execution despite PIA failure.");
                 }
             }
