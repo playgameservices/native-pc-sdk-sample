@@ -136,7 +136,7 @@ namespace GameApp {
             wstring buildUrl;
             buildUrl.reserve(GetWindowTextLength(txtDefaulUrl) + 1);
             GetWindowText(txtDefaulUrl, const_cast<WCHAR*>(buildUrl.c_str()), (int)buildUrl.capacity());
-            //wcout << "data" << buildUrl.data() << endl;
+            //wcout << "data" << buildUrl.data() << std::endl;
             return buildUrl.data();
         }
 
@@ -495,9 +495,9 @@ namespace GameApp {
                 std::string content_type = "application/x-www-form-urlencoded";
                 RestClient::Response response = RestClient::post(url, content_type, payload);
                 std::stringstream mess;
-                mess << "url" << url << endl;
-                mess << "content_type" << content_type << endl;
-                mess << "RestClient::post(url, content_type, payload);" << endl;
+                mess << "url" << url << std::endl;
+                mess << "content_type" << content_type << std::endl;
+                mess << "RestClient::post(url, content_type, payload);" << std::endl;
                 if (response.code == 200) {
                     mess << "POST request successful" << std::endl;
                     mess << "Response body: " << response.body << std::endl;

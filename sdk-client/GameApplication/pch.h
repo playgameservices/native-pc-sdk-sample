@@ -28,4 +28,8 @@
 #endif
 // TODO: add headers that you want to pre-compile here
 
+#include <winsock2.h>
+#include <windows.h>
+#include <iostream>
+using std::endl;
 #endif //PCH_H
