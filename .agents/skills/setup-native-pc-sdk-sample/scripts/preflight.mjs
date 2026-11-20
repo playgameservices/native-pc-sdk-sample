@@ -200,7 +200,8 @@ function inspectAppConfigSummary(relPath) {
       exists: true,
       hasClientId: Boolean(cid && !cid.includes('<')),
       clientIdPrefix: cid ? cid.slice(0, 16) + (cid.length > 16 ? '...' : '') : null,
-      hasClientSecret: Boolean(obj.client_secret && String(obj.client_secret).length > 5),
+      hasOAuthSecretEnv: Boolean(process.env.GOOGLE_OAUTH_CLIENT_SECRET && process.env.GOOGLE_OAUTH_CLIENT_SECRET.trim().length > 5),
+      hasApiAuthTokenEnv: Boolean(process.env.API_AUTH_TOKEN && process.env.API_AUTH_TOKEN.trim().length > 5),
       redirectUri: obj.redirect_uri || null,
     };
   } catch {
@@ -285,7 +286,7 @@ console.log(`${mark(sdm.exists && sdm.packageName && sdm.packageName !== 'your-p
 const am = report.localOverrides.apiClientManifestLocal;
 console.log(`${mark(am.exists)} api-client/.../manifest.local.xml (pkg=${am.packageName || 'unset'})`);
 const ac = report.localOverrides.apiClientAppConfigLocal;
-console.log(`${mark(ac.exists && ac.hasClientId && ac.hasClientSecret)} api-client/.../AppConfig.local.json (clientId=${ac.clientIdPrefix || 'unset'}, secret=${ac.hasClientSecret ? 'SET' : 'MISSING'})`);
+console.log(`${mark(ac.exists && ac.hasClientId)} api-client/GameApplication/Resource Files/AppConfig.local.json (clientId=${ac.clientIdPrefix || 'unset'}, GOOGLE_OAUTH_CLIENT_SECRET env=${ac.hasOAuthSecretEnv ? 'SET' : 'UNSET'}, API_AUTH_TOKEN env=${ac.hasApiAuthTokenEnv ? 'SET' : 'UNSET'})`);
 
 if (report.windowsRuntime.applicable) {
   console.log('\n-- Windows Play Games Runtime & Developer Mode --');

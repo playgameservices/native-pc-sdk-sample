@@ -13,47 +13,9 @@ namespace GameApplication {
 	using namespace System::Net::Sockets;
 	using namespace System::Collections::Generic;
 	using namespace System::Net::Http;
-	/*
-	[DataContract]
-	ref class Config {
-	public:
-		[DataMember]
-			String^ client_id;
-		[DataMember]
-			String^ client_secret;
-		[DataMember]
-			String^ redirect_uri;
-		[DataMember]
-			String^ authorization_Endpoint;
-		[DataMember]
-			String^ authorization_code;
-		[DataMember]
-			String^ Scopes;
-		[DataMember]
-			String^ tokenEndpoint;
-	};*/
-
-	/* [DataContract]
-	ref class GameApis {
-	public:
-		[DataMember]
-			int ID;
-		[DataMember]
-			String^ Method;
-		[DataMember]
-			String^ MethodName;
-		[DataMember]
-			String^ URL;
-		[DataMember]
-			String^ Parameter;
-		[DataMember]
-			String^ Bearer;
-		[DataMember]
-			String^ PostData;
-	};*/
 
 	[DataContract]
-		public ref class Purchase
+	public ref class Purchase
 	{
 	public:
 		[DataMember]
@@ -109,6 +71,7 @@ namespace GameApplication {
 		String^ codeChallenge;
 		String^ mRedirectUri;
 		String^ mBackendBaseUrl;
+		String^ mApiAuthToken;
 	public:
 		AppSettingsFiles();
 		void RegenerateOAuthSecurityParams();
@@ -119,12 +82,10 @@ namespace GameApplication {
 		String^ ReadFile(String^ filePath);
 		Config^ ReadConfig(String^ fileName);
 		List<GameApis^>^ ReadApis(String^ fileName);
-		//PKCE Functions start
+		// PKCE helpers
 		String^ GenerateRandomBase64Url(int length);
 		array<Byte>^ ComputeSha256(String^ input);
 		String^ Base64UrlEncodeNoPadding(array<Byte>^ bytes);
 		String^ ComputeCodeChallenge(String^ verifier);
-
-
 	};
 }

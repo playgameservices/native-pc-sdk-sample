@@ -213,7 +213,6 @@
   <ItemGroup>
     <CopyFileToFolders Include="Resource Files\AppConfig.json" />
     <CopyFileToFolders Include="Resource Files\GameApis.json" />
-    <CopyFileToFolders Include="Resource Files\index.htm" />
     <CopyFileToFolders Include="Resource Files\manifest.xml" />
     <CopyFileToFolders Include="Resource Files\bitmap1.bmp" />
     <CopyFileToFolders Condition="'$(Configuration)'=='Debug' and '$(Platform)'!='Win32' and Exists('..\vcpkg_installed\x64-windows\debug\bin\freeglutd.dll')" Include="..\vcpkg_installed\x64-windows\debug\bin\freeglutd.dll" />

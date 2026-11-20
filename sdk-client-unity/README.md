@@ -32,6 +32,7 @@ This Unity 6000 sample demonstrates how to integrate the **Google Play Games on 
    - **Cloud Project Number**: Your numeric Google Cloud project number *(must match the Google Cloud project of the Service Account configured in [`api-server`](../api-server) so `decodePcIntegrityToken` can decrypt the token)*.
    - **Product Ids**: Your in-app product IDs configured in Google Play Console.
    - **Backend Base Url**: Your deployed [`api-server`](../api-server) base URL.
+   - **Api Auth Token** *(or `API_AUTH_TOKEN` env var)*: A valid Firebase Auth ID token sent as `Authorization: Bearer <token>` when calling `POST /api/verifyIntegrityToken` (prefer the `API_AUTH_TOKEN` environment variable so tokens are never saved in scene assets).
 
 ## Step 3: Build Settings (`IL2CPP`)
 

@@ -25,10 +25,23 @@ export const serviceAccountPrivateKey = (
 // Canonical Play Console package name allowed by this backend.
 export const packageName = process.env.PLAY_PACKAGE_NAME ?? 'com.example.yourgame';
 
-// Optional comma-separated CORS origins (defaults to true for desktop/Unity sample clients).
-export const allowedOrigins: boolean | string[] = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
-  : true;
+// Optional comma-separated CORS origins.
+// Defaults to false (CORS disabled) because native Windows C++ / Unity desktop clients do not
+// require browser CORS; set ALLOWED_ORIGINS explicitly if browser origins must be permitted.
+export function parseAllowedOrigins(rawOrigins?: string): boolean | string[] {
+  if (!rawOrigins) {
+    return false;
+  }
+  const origins = rawOrigins
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+  return origins.length > 0 ? origins : false;
+}
+
+export const allowedOrigins: boolean | string[] = parseAllowedOrigins(
+  process.env.ALLOWED_ORIGINS,
+);
 
 // Real-Time Developer Notifications (RTDN) Cloud Pub/Sub topic ID.
 export const topicID = process.env.RTDN_TOPIC_ID ?? 'your-rtdn-pubsub-topic';

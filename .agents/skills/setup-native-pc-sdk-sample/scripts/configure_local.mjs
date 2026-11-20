@@ -127,17 +127,14 @@ function loadOAuthDesktopConfig(oauthPath) {
   const rawObj = JSON.parse(fs.readFileSync(resolved, 'utf8').replace(/^\uFEFF/, ''));
   const src = rawObj.installed || rawObj.web || rawObj;
   const clientId = String(src.client_id || '').trim();
-  const clientSecret = String(src.client_secret || '').trim();
   if (!clientId || clientId.includes('<')) {
     throw new Error('OAuth JSON is missing a valid client_id.');
   }
-  if (!clientSecret) {
-    throw new Error('OAuth JSON is missing client_secret.');
-  }
+  // Never write client_secret into AppConfig.local.json on disk; api-client loads
+  // GOOGLE_OAUTH_CLIENT_SECRET exclusively from the process environment at runtime.
   return {
     client_id: clientId,
-    client_secret: clientSecret,
-    redirect_uri: 'http://127.0.0.1:8080/',
+    redirect_uri: 'http://127.0.0.1/',
     authorization_Endpoint: String(
       src.authorization_Endpoint || src.auth_uri || 'https://accounts.google.com/o/oauth2/v2/auth',
     ).trim(),
@@ -248,9 +245,7 @@ function main() {
     }
     const manifestXml = buildManifestXml({ packageName, skuList, cloudProjectNumber, backendUrl });
     const appCfgJson = `${JSON.stringify(loadOAuthDesktopConfig(opts['oauth-json']), null, 2)}\n`;
-    plannedWrites.set(path.join('api-client', 'GameApplication', 'manifest.local.xml'), manifestXml);
     plannedWrites.set(path.join('api-client', 'GameApplication', 'Resource Files', 'manifest.local.xml'), manifestXml);
-    plannedWrites.set(path.join('api-client', 'GameApplication', 'AppConfig.local.json'), appCfgJson);
     plannedWrites.set(path.join('api-client', 'GameApplication', 'Resource Files', 'AppConfig.local.json'), appCfgJson);
   }
 
@@ -272,6 +267,12 @@ function main() {
     fs.mkdirSync(path.dirname(dest), { recursive: true });
     fs.writeFileSync(dest, content, { encoding: 'utf8' });
     console.log(`Wrote gitignored override: ${relPath} (${Buffer.byteLength(content, 'utf8')} bytes)`);
+  }
+
+  console.log('\nRuntime environment reminders (not written to disk):');
+  console.log('  - Set API_AUTH_TOKEN=<firebase-id-token> before calling api-server /api/* endpoints.');
+  if (targets.has('api-client')) {
+    console.log('  - Set GOOGLE_OAUTH_CLIENT_SECRET=<oauth-desktop-client-secret> in your shell before running api-client Google Login.');
   }
 
   if (fs.existsSync(path.join(repoRoot, '.git'))) {

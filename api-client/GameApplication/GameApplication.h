@@ -1,5 +1,4 @@
 #pragma once
-#include <Logger.h>
 #include "AppSettingsFiles.h"
 
 #include <DevServer.h>
@@ -11,7 +10,6 @@ namespace GameApplication {
 	using namespace System::Windows::Forms;
 	using namespace System::Data;
 	using namespace System::Drawing;
-	using namespace CLogging;
 
 	/// <summary>
 	/// Summary for GameApplication
@@ -20,7 +18,6 @@ namespace GameApplication {
 	{
 	public:
 		GameApplication(void);
-		Logger* logger = NULL;
 	protected:
 		AppSettingsFiles^ appSettingFiles;
 		String^ mPackageName;
@@ -39,11 +36,11 @@ namespace GameApplication {
 		/// </summary>
 		~GameApplication()
 		{
+			StopActiveListener();
 			if (components)
 			{
 				delete components;
 			}
-			delete logger;
 		}
 	private:
 		/// <summary>
@@ -360,13 +357,16 @@ namespace GameApplication {
 
 		HttpListenerThread^ listenerFuncThread;
 		Thread^ listenerBackgroundThread;
+		bool mAuthInFlight;
 		static void RunListener(Object^ listenerObj);
+		void StopActiveListener();
+		String^ StripQueryString(String^ url);
+		void AttachBackendAuthHeader(HttpRequestMessage^ requestMessage);
 		void AccessToken();
 		String^ BuildAuthorizationUrl(String^ state, String^ codeChallenge);
 
 		void GetSkusDetails();
 		void GetPurchasesDetails();
-		void GetValidatePurchase();
 		void GetAcknowledgePurchase();
 		void PostValidatePurchase();
 		void PostConsumePurchase();

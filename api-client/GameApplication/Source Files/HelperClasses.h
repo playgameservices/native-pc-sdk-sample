@@ -12,28 +12,14 @@ namespace GameApplication {
 	using namespace System::Net::Sockets;
 	using namespace System::Collections::Generic;
 	using namespace System::Net::Http;
-	using namespace System::Runtime::Serialization::Json;
-	using namespace System::Runtime::Serialization;
-	using namespace System::Threading::Tasks;
-	using namespace System;
-	using namespace System::ComponentModel;
-	using namespace System::Collections;
-	using namespace System::Windows::Forms;
-	using namespace System::Data;
-	using namespace System::Drawing;
-	using namespace System::Net;
-	using namespace System::Net::Sockets;
-	using namespace System::Collections::Generic;
-	using namespace System::Net::Http;
 	using namespace System::Text;
 	using namespace System::Runtime::Serialization::Json;
 	using namespace System::Runtime::Serialization;
+	using namespace System::Threading::Tasks;
 	using namespace System::IO;
-
 	using namespace System::Text::RegularExpressions;
 	using namespace System::Net::NetworkInformation;
 	using namespace System::Diagnostics;
-
 
 	String^ ReadFile(String^ filePath);
 
@@ -79,8 +65,6 @@ namespace GameApplication {
 		[DataMember]
 		String^ client_id;
 		[DataMember]
-		String^ client_secret;
-		[DataMember]
 		String^ redirect_uri;
 		[DataMember]
 		String^ authorization_Endpoint;
@@ -113,6 +97,7 @@ namespace GameApplication {
 
 	public ref class SharedData {
 	public:
+		Object^ syncRoot;
 		Config^ sdConfig;
 		Response^ sdResposne;
 		String^ sdAccessToken;
@@ -120,28 +105,10 @@ namespace GameApplication {
 		String^ sdApiResponse;
 		String^ mState;
 		String^ codeVerifier;
-		String^ sdServiceAccessToken;
+		SharedData() {
+			syncRoot = gcnew Object();
+		}
 	};
-
-	ref class AppConfig {
-	public:
-		//[JsonProperty("client_id")]
-		String^ client_id;
-		//[JsonProperty("client_secret")]
-		String^ client_secret;
-		//[JsonProperty("redirect_uri")]
-		String^ redirect_uri;
-		//[JsonProperty("authorization_Endpoint")]
-		String^ authorization_Endpoint;
-		//[JsonProperty("authorization_code")]
-		String^ authorization_code;
-		//[JsonProperty("Scopes")]
-		String^ Scopes;
-		//[JsonProperty("tokenEndpoint")]
-		String^ tokenEndpoint;
-		AppConfig() {}
-	};
-
 
 	[DataContract]
 	public ref class RequestData
@@ -153,8 +120,47 @@ namespace GameApplication {
 			String^ sku;
 		[DataMember]
 			String^ token;
+		[DataMember(EmitDefaultValue = false)]
+			String^ packageName;
 		RequestData();
 		RequestData(String^ ssku, String^ stoken);
+		RequestData(String^ ssku, String^ stoken, String^ spkg);
+	};
+
+	[DataContract]
+	public ref class PurchasesRequestData
+	{
+	public:
+		[DataMember]
+			String^ userAccessToken;
+		PurchasesRequestData(String^ accessToken) : userAccessToken(accessToken) {}
+	};
+
+	[DataContract]
+	public ref class SkuDetailsRequestData
+	{
+	public:
+		[DataMember]
+			String^ userAccessToken;
+		[DataMember]
+			String^ sku;
+		[DataMember]
+			String^ skuType;
+		[DataMember]
+			String^ userIpAddress;
+		[DataMember]
+			String^ languageCode;
+		SkuDetailsRequestData(
+			String^ accessToken,
+			String^ ssku,
+			String^ sType,
+			String^ ip,
+			String^ lang)
+			: userAccessToken(accessToken),
+			  sku(ssku),
+			  skuType(sType),
+			  userIpAddress(ip),
+			  languageCode(lang) {}
 	};
 
 	[DataContract]
@@ -168,11 +174,6 @@ namespace GameApplication {
 		IntegrityRequestData(String^ pkg, String^ tok) : packageName(pkg), token(tok) {}
 	};
 
-	//template<typename T>
-	//String^ Serialize(T^ data);
-
-	//template<typename T>
-	//T^ Deserialize(String^ json);
 	template<typename T>
 	String^ Serialize(T^ data)
 	{
@@ -195,24 +196,12 @@ namespace GameApplication {
 		return data;
 	}
 
-	template <typename T>
-	T ParseJsonFile(String^ filePath) {
-		// Read the JSON content
-		String^ json = System::IO::File::ReadAllText(filePath);
-
-		// Parse JSON into the specified type
-		T result = nullptr;//Newtonsoft::Json::JsonConvert::DeserializeObject<T>(json);
-
-		return result;
-	}
-
 	List<String^>^ ExtractCurlyBracesBlocks(String^ data);
 
-	//Util-Functions
+	// Util-Functions
 	String^ GetLocalIPAddress();
-	Dictionary<String^, String^>^ ParseQueryParameters(String^ url);
-
-
+	bool TryValidateAllowedHttpsUrl(String^ rawUrl, String^ expectedHost, Uri^% outUri);
+	String^ RedactTokenForLog(String^ secret);
 
 	[DataContract]
 	ref class localizedPrice
@@ -246,7 +235,6 @@ namespace GameApplication {
 	public:
 		[DataMember]
 			resources^ resource;
-
 	};
 
 	[DataContract]
@@ -255,13 +243,10 @@ namespace GameApplication {
 	public:
 		[DataMember]
 			result^ result;
-
 	};
 
-	//template <typename T^>
 	String^ GetSkuObj(String^ jsonString);
 
 };
-
 
 #endif // !HELPERCLASSES_H

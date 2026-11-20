@@ -3,7 +3,7 @@
 - **Repository**: `https://github.com/playgameservices/native-pc-sdk-sample/`
 - **Target SDK**: Google Play Games PC SDK `26.9.261.0+`
 - **Components**: `sdk-client` (C++ Win32), `sdk-client-unity` (Unity 6000 C#), `api-client` (Legacy REST Migration Reference), `api-server` (Firebase Cloud Functions Node.js 22 Verification Backend)
-- **Last Updated**: 2026-11-19
+- **Last Updated**: 2026-11-20
 
 ---
 
@@ -35,7 +35,7 @@ flowchart TB
     end
 
     subgraph DeveloperBackend["Developer Trusted Backend"]
-        APISERVER["api-server (Firebase Cloud Functions — Node.js 22)<br/>Express Endpoints (/api/*)<br/>Lazy JWT + Parameterized googleapis Client"]
+        APISERVER["api-server (Firebase Cloud Functions — Node.js 22)<br/>POST-Only /api/* + Firebase Auth Bearer Gate<br/>Default-Closed CORS + Parameterized googleapis Client"]
     end
 
     subgraph GoogleCloud["Google Play & Cloud Backend Services"]
@@ -48,9 +48,9 @@ flowchart TB
     UNITY <-->|"PlayPcSdkManaged C# API<br/>(BillingClient / IntegrityClient)"| GPG
     GPG <-->|"Authenticated Play Client Channel"| PLAYBILLING
 
-    CPP -->|"HTTPS POST<br/>/api/verifyIntegrityToken"| APISERVER
-    UNITY -->|"HTTPS POST<br/>/api/verifyIntegrityToken"| APISERVER
-    APICLIENT <-->|"HTTPS GET/POST<br/>/api/getSkuDetails, /api/getPurchases<br/>/api/verifyPurchaseToken, /api/acknowledgePurchase<br/>/api/consumePurchase, /api/verifyIntegrityToken"| APISERVER
+    CPP -->|"HTTPS POST (Bearer ID Token)<br/>/api/verifyIntegrityToken"| APISERVER
+    UNITY -->|"HTTPS POST (Bearer ID Token)<br/>/api/verifyIntegrityToken"| APISERVER
+    APICLIENT <-->|"HTTPS POST (Bearer ID Token)<br/>/api/getSkuDetails, /api/getPurchases<br/>/api/verifyPurchaseToken, /api/acknowledgePurchase<br/>/api/consumePurchase, /api/verifyIntegrityToken"| APISERVER
 
     APISERVER <-->|"Service Account JWT<br/>purchases.products.* / skus"| PUBLISHER
     APISERVER <-->|"Service Account JWT<br/>v1.decodePcIntegrityToken"| INTEGRITY
@@ -64,12 +64,12 @@ Developers migrating from `api-client/` to `sdk-client/` replace manual OAuth2 b
 
 | Workflow Step | Legacy `api-client` (OAuth2 + REST) | Modern `sdk-client` (C++ SDK `26.9.261.0+`) | Modern `sdk-client-unity` (C# SDK `26.9.261.0+`) |
 | :--- | :--- | :--- | :--- |
-| **1. Initialization & Auth** | Manual browser OAuth2 login (`Google Login` $\rightarrow$ loopback `127.0.0.1:8080` listener $\rightarrow$ PKCE `S256` token exchange for `userAccessToken`) | `GooglePlayInitialize(continuation, GooglePlayInitializeParams{.package_name})` + `BillingClient(BillingClientParams{.enable_pending_purchases = true})` (Zero OAuth code needed; authenticated by Play Games client) | `PlayPcSdkFactory.Initialize(packageName).InitializeAsync()` + `PlayPcSdkFactory.CreateBillingClient(new BillingClientParams { EnablePendingPurchases = true })` |
-| **2. Product Catalog Query** | `GET /api/getSkuDetails` with `userAccessToken`, `sku`, `ipAddress`, `languageCode` *(EAP-restricted REST endpoint)* | `BillingClient::QueryProductDetails(QueryProductDetailsParams, continuation)` *(local IPC; supports multi-SKU selection & `full_price_micros`)* | `BillingClient.QueryProductDetailsAsync(QueryProductDetailsParams)` |
+| **1. Initialization & Auth** | Manual browser OAuth2 login (`Google Login` $\rightarrow$ per-login ephemeral `127.0.0.1` loopback listener $\rightarrow$ PKCE `S256` token exchange for `userAccessToken`) | `GooglePlayInitialize(continuation, GooglePlayInitializeParams{.package_name})` + `BillingClient(BillingClientParams{.enable_pending_purchases = true})` (Zero OAuth code needed; authenticated by Play Games client) | `PlayPcSdkFactory.Initialize(packageName).InitializeAsync()` + `PlayPcSdkFactory.CreateBillingClient(new BillingClientParams { EnablePendingPurchases = true })` |
+| **2. Product Catalog Query** | `POST /api/getSkuDetails` with JSON body (`userAccessToken`, `sku`, `userIpAddress`, `languageCode`) *(EAP-restricted REST endpoint)* | `BillingClient::QueryProductDetails(QueryProductDetailsParams, continuation)` *(local IPC; supports multi-SKU selection & `full_price_micros`)* | `BillingClient.QueryProductDetailsAsync(QueryProductDetailsParams)` |
 | **3. Alternative Billing Check** | *Not supported in legacy REST* | `BillingClient::IsBillingProgramAvailable(IsBillingProgramAvailableParams, continuation)` | `BillingClient.IsBillingProgramAvailableAsync(IsBillingProgramAvailableParams)` |
 | **4. Alternative Billing Reporting Token** | *Not supported in legacy REST* | `BillingClient::CreateBillingProgramReportingDetails(CreateBillingProgramReportingDetailsParams, continuation)` $\rightarrow$ returns `external_transaction_token` | `BillingClient.CreateBillingProgramReportingDetailsAsync(CreateBillingProgramReportingDetailsParams)` $\rightarrow$ returns `ReportingDetails` |
-| **5. Purchase Checkout Flow** | Launch system browser with checkout URL returned from `getSkuDetails`, then query `Get Purchases` | `BillingClient::LaunchPurchaseFlow(LaunchPurchaseFlowParams{.offer_token}, continuation)` $\rightarrow$ renders native Play overlay & returns `ProductPurchaseDetails` directly | `BillingClient.LaunchPurchaseFlowAsync(LaunchPurchaseFlowParams)` $\rightarrow$ returns `LaunchPurchaseFlowResultValue` |
-| **6. Restore Existing Purchases** | `GET /api/getPurchases?packageName=...&userAccessToken=...` *(EAP-restricted REST endpoint)* | `BillingClient::QueryPurchases(QueryPurchasesParams, continuation)` $\rightarrow$ returns `vector<ProductPurchaseDetails>` | `BillingClient.QueryPurchasesAsync(QueryPurchasesParams)` $\rightarrow$ returns `List<ProductPurchaseDetails>` |
+| **5. Purchase Checkout Flow** | Launch system browser with validated `https://play.google.com` checkout URL returned from `getSkuDetails`, then query `Get Purchases` | `BillingClient::LaunchPurchaseFlow(LaunchPurchaseFlowParams{.offer_token}, continuation)` $\rightarrow$ renders native Play overlay & returns `ProductPurchaseDetails` directly | `BillingClient.LaunchPurchaseFlowAsync(LaunchPurchaseFlowParams)` $\rightarrow$ returns `LaunchPurchaseFlowResultValue` |
+| **6. Restore Existing Purchases** | `POST /api/getPurchases` with JSON body (`userAccessToken`) *(EAP-restricted REST endpoint)* | `BillingClient::QueryPurchases(QueryPurchasesParams, continuation)` $\rightarrow$ returns `vector<ProductPurchaseDetails>` | `BillingClient.QueryPurchasesAsync(QueryPurchasesParams)` $\rightarrow$ returns `List<ProductPurchaseDetails>` |
 | **7. Acknowledge Non-Consumable** | `POST /api/acknowledgePurchase` (Server REST API) | Client SDK `BillingClient::AcknowledgePurchase(AcknowledgePurchaseParams{.purchase_token}, continuation)` (or Server `/api/acknowledgePurchase` after token verification) | `BillingClient.AcknowledgePurchaseAsync(AcknowledgePurchaseParams)` |
 | **8. Consume Consumable** | `POST /api/consumePurchase` (Server REST API) | Client SDK `BillingClient::ConsumePurchase(ConsumePurchaseParams{.purchase_token}, continuation)` (or Server `/api/consumePurchase` after token verification) | `BillingClient.ConsumePurchaseAsync(ConsumePurchaseParams)` |
 | **9. Play Integrity Verification** | `POST /api/verifyIntegrityToken` | `IntegrityClient::PrepareIntegrityToken` $\rightarrow$ `IntegrityClient::RequestIntegrityToken` (with SHA-256 `request_hash`) $\rightarrow$ `POST /api/verifyIntegrityToken` | `IntegrityClient.PrepareIntegrityTokenAsync` $\rightarrow$ `IntegrityClient.RequestIntegrityTokenAsync` $\rightarrow$ `POST /api/verifyIntegrityToken` |
@@ -139,11 +139,11 @@ Developers migrating from `api-client/` to `sdk-client/` replace manual OAuth2 b
 
 #### Purpose & Scope
 - Retained specifically as a **side-by-side "Before" reference** for developers migrating from legacy OAuth2 + Web REST billing to `sdk-client/`.
-- Cleaned up to remove dead `#ifdef __ANDROID__` NDK files and stale `IDR_JSON3` (`userToken.json`) resource entries in UTF-16LE `GameApplication.rc`, while fixing security and runtime defects in the Windows C++/CLI implementation:
-  1. **Fresh Per-Login RFC 7636 PKCE (`S256`) & `state` CSRF Validation**: `AppSettingsFiles::RegenerateOAuthSecurityParams()` mints fresh CSPRNG `state` and PKCE `code_verifier`/`code_challenge` values on every `Google Login` click in `GameHelper.cpp` and validates them in `DevServer.cpp`.
-  2. **Strict Loopback Listener Binding**: Binds `HttpListener` strictly to `http://127.0.0.1:8080/` with open-proxy routes removed.
-  3. **Gitignored `.local` Overrides & `<BackendBaseUrl>` Rewriting**: `AppSettingsFiles` resolves `manifest.local.xml` and `AppConfig.local.json` first (copied to `$(OutDir)manifest.xml` and `$(OutDir)AppConfig.json` by MSBuild `CopyLocalConfigOverrides`) and rewrites loaded `GameApis.json` URLs when `<BackendBaseUrl>` is set.
-  4. **Purchase Token & Parameter-Table Synchronization**: `GetPurchasesDetails()` syncs `mSku` with the purchased `productId`; `GetValidatePurchase()`, `GetAcknowledgePurchase()`, and `PostConsumePurchase()` honor manual `token` / `productId` edits in `tableParameters` and surface HTTP error bodies in `txtResult`; `VerifyIntegrityToken` leaves `token` clean for pasting a Play Integrity token rather than prefilling the OAuth2 access token.
+- Cleaned up to remove dead `#ifdef __ANDROID__` NDK files, duplicate root configs, `index.htm`, and all JSON/HTML/XML RCDATA entries (`IDR_JSON1`/`IDR_JSON2`/`IDR_HTML1`/`IDR_XML1`) from UTF-16LE `GameApplication.rc`, while hardening the Windows C++/CLI implementation:
+  1. **Per-Login Ephemeral `127.0.0.1` `TcpListener` + RFC 7636 PKCE (`S256`) & Single-Use `state`**: `AccessToken()` binds a `TcpListener(IPAddress::Loopback, 0)` directly on an OS-assigned ephemeral port for the duration of the login attempt (zero probe-then-rebind race, zero always-on port, zero `index.htm` response), mints fresh CSPRNG `state` and PKCE `code_verifier`/`code_challenge`, validates `GET /` with constant-time `state` comparison under a synchronization lock, consumes `state`/`code_verifier` once on success, and stops the listener in `finally` and `~GameApplication()`.
+  2. **Strict HTTPS Host Allowlists & Env-Only `GOOGLE_OAUTH_CLIENT_SECRET`**: `TryValidateAllowedHttpsUrl()` pins `authUrl` to `https://accounts.google.com` and `deepLink` (inside both `GetSkuObj()` and `GetSkusDetails()`) to `https://play.google.com` with empty `UserInfo`. `client_secret` is never stored in tracked or `.local` config files and is loaded exclusively from `GOOGLE_OAUTH_CLIENT_SECRET`.
+  3. **POST-Only JSON Calls, Bearer Auth & Redacted Logging**: All backend calls (`getSkuDetails`, `getPurchases`, `verifyPurchaseToken`, `acknowledgePurchase`, `consumePurchase`, `verifyIntegrityToken`) send JSON `POST` bodies with optional `Authorization: Bearer` headers (`API_AUTH_TOKEN` env var or `<ApiAuthToken>` in gitignored `manifest.local.xml`) and redact live tokens from stdout logs.
+  4. **Single-Source `.local` Overrides (`Resource Files/`)**: `AppSettingsFiles` resolves `Resource Files\manifest.local.xml` and `Resource Files\AppConfig.local.json` first (copied to `$(OutDir)` by MSBuild `CopyLocalConfigOverrides`) and rewrites loaded `GameApis.json` URLs when `<BackendBaseUrl>` is set.
 
 ---
 
@@ -175,11 +175,13 @@ api-server/
 1. **Node.js 22 Runtime & Lazy Service Account Initialization**:
    - Targets `"runtime": "nodejs22"` (following Cloud Functions' 2026-10-30 decommission of `nodejs20`) and exports cleanly scoped `main` (HTTP `/api/*`) and `rtdnListener` (Pub/Sub) functions.
    - `playApiClient.ts` initializes `google.auth.JWT` and `google.androidpublisher` lazily inside `getPlayClients()` on first request so `process.env.SA_EMAIL`, `process.env.SA_KEY`, and `process.env.PLAY_PACKAGE_NAME` from `functions/.env` (or Cloud Secret Manager) are always loaded cleanly during both Firebase CLI discovery and runtime execution.
-2. **Token-Based Client-to-Server Contract & Package Isolation**:
-   - Sample clients (`sdk-client`, `sdk-client-unity`, `api-client`) pass Google-issued tokens (`userAccessToken`, `purchaseToken`, or `integrity_token`) without requiring Firebase Auth.
-   - `resolvePackageName()` enforces strict single-package isolation whenever `PLAY_PACKAGE_NAME` is configured, rejecting cross-package abuse with `Unauthorized packageName`.
-3. **Zero Raw URL Interpolation (SSRF Prevention)**:
-   - All calls to Google APIs use parameterized `googleapis` SDK methods (`purchases.products.get`, `.acknowledge`, `.consume`, `purchases.subscriptions.get`) or `new URL()` + `encodeURIComponent()` + `URLSearchParams` with strict regex validation (`PACKAGE_NAME_REGEX`, `PRODUCT_ID_REGEX`, `SAFE_TOKEN_REGEX`).
+2. **Fail-Closed Firebase Auth Middleware, Default-Closed CORS & Package Pinning**:
+   - Every `/api/*` endpoint is gated by `createVerifyAuthMiddleware()` calling `admin.auth().verifyIdToken(...)` and returning HTTP `401` on missing, malformed, or invalid `Authorization: Bearer <token>` headers.
+   - `parseAllowedOrigins()` defaults `allowedOrigins` to `false` (CORS disabled unless `ALLOWED_ORIGINS` is explicitly populated), registered once on the `/api` router.
+   - `resolvePackageName()` unconditionally enforces single-package isolation against the server-configured package name (whether from `PLAY_PACKAGE_NAME` or `config.ts`), rejecting unauthorized package names with HTTP `403`.
+3. **POST-Only JSON Bodies, Strict String Typing & Sanitized Cloud Logging**:
+   - All `/api/*` routes accept `POST` JSON bodies only (removing query-string token fallbacks), reject non-string/array inputs with HTTP `400`, validate tokens against a positive character allowlist (`SAFE_TOKEN_REGEX`), and call parameterized `googleapis` SDK methods or `new URL()` + `encodeURIComponent()`.
+   - `sanitizeErrorForLog()` strips HTTP request/response config objects (including `Authorization` headers) before writing errors to Cloud Logging, and `rtdnListener` validates `notification.packageName` and logs only non-secret event metadata.
 
 ---
 

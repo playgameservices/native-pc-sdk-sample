@@ -2,10 +2,7 @@
 #include "HelperClasses.h"
 #include <fstream>
 
-//#include <google/cloud/access_token.h>
-
 using namespace System::Threading::Tasks;
-
 using namespace System::Text::RegularExpressions;
 using namespace System::Net::NetworkInformation;
 using namespace System::Diagnostics;
@@ -26,7 +23,6 @@ namespace GameApplication {
     using namespace System::Runtime::Serialization;
     using namespace System::IO;
 
-
     RequestData::RequestData()
     {
     }
@@ -36,6 +32,15 @@ namespace GameApplication {
         productId = ssku;
         sku = ssku;
         token = stoken;
+        packageName = nullptr;
+    }
+
+    RequestData::RequestData(String^ ssku, String^ stoken, String^ spkg)
+    {
+        productId = ssku;
+        sku = ssku;
+        token = stoken;
+        packageName = spkg;
     }
 
     List<String^>^ ExtractCurlyBracesBlocks(String^ data)
@@ -61,9 +66,12 @@ namespace GameApplication {
 
         try {
             StreamReader^ reader = gcnew StreamReader(filePath);
-            String^ content = reader->ReadToEnd();
-            reader->Close();
-            return content;
+            try {
+                return reader->ReadToEnd();
+            }
+            finally {
+                reader->Close();
+            }
         }
         catch (Exception^ ex) {
             throw gcnew IOException("An error occurred while reading the file: " + ex->Message, ex);
@@ -75,7 +83,6 @@ namespace GameApplication {
         String^ fileData = ReadFile(fileName);
         MemoryStream^ stream = gcnew MemoryStream(System::Text::Encoding::UTF8->GetBytes(fileData));
         DataContractJsonSerializer^ serializer = gcnew DataContractJsonSerializer(List<GameApis^>::typeid);
-        // Deserialize the JSON data
         List<GameApis^>^ apiList = dynamic_cast<List<GameApis^>^>(serializer->ReadObject(stream));
         return apiList;
     }
@@ -88,7 +95,7 @@ namespace GameApplication {
         Config^ config = static_cast<Config^>(serializer->ReadObject(stream));
         return config;
     }
-    
+
     Response^ ReadResponse(String^ jsonString)
     {
         MemoryStream^ stream = gcnew MemoryStream(System::Text::Encoding::UTF8->GetBytes(jsonString));
@@ -97,16 +104,51 @@ namespace GameApplication {
         return response;
     }
 
-    String^ GetSkuObj(String^ jsonString)
+    bool TryValidateAllowedHttpsUrl(String^ rawUrl, String^ expectedHost, Uri^% outUri)
     {
-        String^ res = "";
-        Match^ nameMatch = Regex::Match(jsonString, "\"deepLink\"\\s*:\\s*\"([^\"]*)\"");
-        if (nameMatch->Success) {
-            res = nameMatch->Groups[1]->ToString();
+        outUri = nullptr;
+        if (String::IsNullOrWhiteSpace(rawUrl) || String::IsNullOrWhiteSpace(expectedHost)) {
+            return false;
         }
-        return res;
+        Uri^ parsed = nullptr;
+        if (!Uri::TryCreate(rawUrl->Trim(), UriKind::Absolute, parsed) || parsed == nullptr) {
+            return false;
+        }
+        if (parsed->Scheme != Uri::UriSchemeHttps) {
+            return false;
+        }
+        if (!String::IsNullOrEmpty(parsed->UserInfo)) {
+            return false;
+        }
+        if (!parsed->Host->Equals(expectedHost, StringComparison::OrdinalIgnoreCase)) {
+            return false;
+        }
+        outUri = parsed;
+        return true;
     }
 
+    String^ RedactTokenForLog(String^ secret)
+    {
+        if (String::IsNullOrEmpty(secret)) {
+            return "(empty)";
+        }
+        return String::Format("<redacted:{0} chars>", secret->Length);
+    }
+
+    String^ GetSkuObj(String^ jsonString)
+    {
+        String^ rawLink = "";
+        Match^ nameMatch = Regex::Match(jsonString, "\"deepLink\"\\s*:\\s*\"([^\"]*)\"");
+        if (nameMatch->Success) {
+            rawLink = nameMatch->Groups[1]->ToString();
+        }
+        Uri^ validatedUri = nullptr;
+        if (!TryValidateAllowedHttpsUrl(rawLink, "play.google.com", validatedUri)) {
+            Console::WriteLine("Rejected deepLink outside https://play.google.com allowlist.");
+            return "";
+        }
+        return validatedUri->AbsoluteUri;
+    }
 
     String^ GetLocalIPAddress()
     {
@@ -136,56 +178,5 @@ namespace GameApplication {
         }
         return "";
     }
-
-
-
-    Dictionary<String^, String^>^ ParseQueryParameters(String^ url) {
-        try {
-            // Create a Uri instance from the URL
-            Uri^ uri = gcnew Uri(url);
-
-            // Extract the query string (removing the '?' character)
-            String^ query = uri->Query->TrimStart('?');
-
-            // Check if the query string is empty
-            if (String::IsNullOrWhiteSpace(query)) {
-                Console::WriteLine("No query parameters found.");
-                return nullptr;
-            }
-
-            // Split the query string into key-value pairs
-            array<String^>^ pairs = query->Split('&');
-            Dictionary<String^, String^>^ queryParams = gcnew Dictionary<String^, String^>(1);
-
-            // Iterate through each key-value pair
-            for each (String ^ pair in pairs) {
-                array<String^>^ keyValue = pair->Split('=');
-                if (keyValue->Length == 2) {
-                    String^ key = Uri::UnescapeDataString(keyValue[0]);
-                    String^ value = Uri::UnescapeDataString(keyValue[1]);
-                    queryParams->Add(key, value);
-                }
-                else if (keyValue->Length == 1) {
-                    // Handle keys with no value
-                    String^ key = Uri::UnescapeDataString(keyValue[0]);
-                    queryParams->Add(key, "");
-                }
-            }
-
-            // Output the parsed query parameters
-            for each (KeyValuePair<String^, String^> kvp in queryParams) {
-                Console::WriteLine("{0}: {1}", kvp.Key, kvp.Value);
-            }
-            return queryParams;
-        }
-        catch (UriFormatException^ ex) {
-            Console::WriteLine("Invalid URL: {0}", ex->Message);
-        }
-        catch (Exception^ ex) {
-            Console::WriteLine("An error occurred: {0}", ex->Message);
-        }
-        return nullptr;
-    }
-
 
 };

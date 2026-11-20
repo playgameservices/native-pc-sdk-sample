@@ -39,6 +39,9 @@ public class GameStoreManager : MonoBehaviour
     [Tooltip("Backend base URL (api-server) used to verify Play Integrity tokens.")]
     [SerializeField] private string _backendBaseUrl = "https://your-project.web.app";
 
+    [Tooltip("Optional Firebase Auth ID token sent as Authorization: Bearer to api-server (API_AUTH_TOKEN env var takes precedence; never commit real tokens).")]
+    [SerializeField] private string _apiAuthToken = "";
+
     [Header("UI References (Existing Scene Bindings Preserved)")]
     [SerializeField] private Button _initializeButton;
     [SerializeField] private Button _queryProductsButton;
@@ -99,11 +102,11 @@ public class GameStoreManager : MonoBehaviour
         _exitButton?.onClick.AddListener(ExitGame);
 
         SetPostInitButtonsInteractable(false);
-        if (_purchaseButton != null) _purchaseButton.interactable = false;
-        if (_acknowledgePurchaseButton != null) _acknowledgePurchaseButton.interactable = false;
-        if (_consumePurchaseButton != null) _consumePurchaseButton.interactable = false;
-        if (_requestIntegrityButton != null) _requestIntegrityButton.interactable = false;
-        if (_verifyIntegrityButton != null) _verifyIntegrityButton.interactable = false;
+        SetButtonInteractable(_purchaseButton, false);
+        SetButtonInteractable(_acknowledgePurchaseButton, false);
+        SetButtonInteractable(_consumePurchaseButton, false);
+        SetButtonInteractable(_requestIntegrityButton, false);
+        SetButtonInteractable(_verifyIntegrityButton, false);
 
         if (_logText != null)
         {
@@ -198,71 +201,106 @@ public class GameStoreManager : MonoBehaviour
         return btn;
     }
 
+    private static void SetButtonInteractable(Button button, bool interactable)
+    {
+        if (button != null)
+        {
+            button.interactable = interactable;
+        }
+    }
+
+    private static string RedactTokenForLog(string token)
+    {
+        if (string.IsNullOrEmpty(token))
+        {
+            return "(empty)";
+        }
+        return $"<redacted:{token.Length} chars>";
+    }
+
     private void SetPostInitButtonsInteractable(bool interactable)
     {
-        if (_queryProductsButton != null) _queryProductsButton.interactable = interactable;
-        if (_isBillingProgramAvailableButton != null) _isBillingProgramAvailableButton.interactable = interactable;
-        if (_createReportingDetailsButton != null) _createReportingDetailsButton.interactable = interactable;
-        if (_queryPurchasesButton != null) _queryPurchasesButton.interactable = interactable;
-        if (_integrityButton != null) _integrityButton.interactable = interactable;
+        SetButtonInteractable(_queryProductsButton, interactable);
+        SetButtonInteractable(_isBillingProgramAvailableButton, interactable);
+        SetButtonInteractable(_createReportingDetailsButton, interactable);
+        SetButtonInteractable(_queryPurchasesButton, interactable);
+        SetButtonInteractable(_integrityButton, interactable);
     }
 
     private void UpdatePurchaseActionButtons()
     {
         bool hasToken = !string.IsNullOrEmpty(_lastPurchaseToken);
-        if (_acknowledgePurchaseButton != null) _acknowledgePurchaseButton.interactable = hasToken;
-        if (_consumePurchaseButton != null) _consumePurchaseButton.interactable = hasToken;
+        SetButtonInteractable(_acknowledgePurchaseButton, hasToken);
+        SetButtonInteractable(_consumePurchaseButton, hasToken);
     }
 
     // 1. Initialize Billing SDK
     private async void InitializeSDK()
     {
         Log("Initializing Play Games PC SDK...");
-        if (_initializeButton != null) _initializeButton.interactable = false;
-
-        var initializationHandler = PlayPcSdkFactory.InitializationHandler;
-        var initParams = new GooglePlayInitializeParams
+        SetButtonInteractable(_initializeButton, false);
+        bool initSucceeded = false;
+        try
         {
-            PackageName = string.IsNullOrWhiteSpace(_packageName) || _packageName == "com.yourcompany.yourgame"
-                ? null
-                : _packageName
-        };
-
-        var result = await GooglePlayInitialization.InitializeAsync(initializationHandler, initParams);
-        if (result.IsOk)
-        {
-            _billingClient?.Dispose();
-            _integrityClient?.Dispose();
-
-            var clientParams = new BillingClientParams { EnablePendingPurchases = true };
-            _billingClient = PlayPcSdkFactory.CreateBillingClient(clientParams);
-            _integrityClient = PlayPcSdkFactory.CreateIntegrityClient();
-
-            Log($"<color=green>SDK initialized! Environment={result.Value.Environment}, FormFactor={result.Value.FormFactor}</color>");
-            SetPostInitButtonsInteractable(true);
-        }
-        else
-        {
-            Log($"<color=red>Initialization failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
-
-            switch (result.Code)
+            var initializationHandler = PlayPcSdkFactory.InitializationHandler;
+            var initParams = new GooglePlayInitializeParams
             {
-                case InitializationError.ActionRequiredShutdownClientProcess:
-                    Log("<color=yellow>ActionRequiredShutdownClientProcess: Google Play Games is relaunching the game. Quitting current process...</color>");
-                    Application.Quit();
-                    return;
-                case InitializationError.SdkRuntimeUpdateRequired:
-                    Log("<color=yellow>Please update Google Play Games on PC and the SDK runtime.</color>");
-                    break;
-                case InitializationError.SdkRuntimeUnavailable:
-                    Log("<color=yellow>Google Play Games SDK runtime service is unavailable.</color>");
-                    break;
-                case InitializationError.SdkRuntimeNotInstalled:
-                    Log("<color=yellow>Google Play Games on PC is not installed on this machine.</color>");
-                    break;
-            }
+                PackageName = string.IsNullOrWhiteSpace(_packageName) || _packageName == "com.yourcompany.yourgame"
+                    ? null
+                    : _packageName
+            };
 
-            if (_initializeButton != null) _initializeButton.interactable = true;
+            var result = await GooglePlayInitialization.InitializeAsync(initializationHandler, initParams);
+            if (this == null) return;
+
+            if (result.IsOk)
+            {
+                _billingClient?.Dispose();
+                _integrityClient?.Dispose();
+
+                var clientParams = new BillingClientParams { EnablePendingPurchases = true };
+                _billingClient = PlayPcSdkFactory.CreateBillingClient(clientParams);
+                _integrityClient = PlayPcSdkFactory.CreateIntegrityClient();
+                initSucceeded = true;
+
+                Log($"<color=green>SDK initialized! Environment={result.Value.Environment}, FormFactor={result.Value.FormFactor}</color>");
+                SetPostInitButtonsInteractable(true);
+            }
+            else
+            {
+                Log($"<color=red>Initialization failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
+
+                switch (result.Code)
+                {
+                    case InitializationError.ActionRequiredShutdownClientProcess:
+                        Log("<color=yellow>ActionRequiredShutdownClientProcess: Google Play Games is relaunching the game. Quitting current process...</color>");
+                        Application.Quit();
+                        return;
+                    case InitializationError.SdkRuntimeUpdateRequired:
+                        Log("<color=yellow>Please update Google Play Games on PC and the SDK runtime.</color>");
+                        break;
+                    case InitializationError.SdkRuntimeUnavailable:
+                        Log("<color=yellow>Google Play Games SDK runtime service is unavailable.</color>");
+                        break;
+                    case InitializationError.SdkRuntimeNotInstalled:
+                        Log("<color=yellow>Google Play Games on PC is not installed on this machine.</color>");
+                        break;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            if (this != null)
+            {
+                Log($"<color=red>InitializeSDK threw exception: {ex.Message}</color>");
+            }
+        }
+        finally
+        {
+            if (this != null && !initSucceeded)
+            {
+                SetButtonInteractable(_initializeButton, true);
+            }
         }
     }
 
@@ -276,65 +314,77 @@ public class GameStoreManager : MonoBehaviour
         }
 
         Log("Querying product details...");
-        _queryProductsButton.interactable = false;
-
-        var productIds = new List<ProductId>();
-        if (_productIds != null)
+        SetButtonInteractable(_queryProductsButton, false);
+        try
         {
-            foreach (string id in _productIds)
+            var productIds = new List<ProductId>();
+            if (_productIds != null)
             {
-                if (!string.IsNullOrWhiteSpace(id))
+                foreach (string id in _productIds)
                 {
-                    productIds.Add(new ProductId { Id = id.Trim(), ProductType = ProductType.InApp });
+                    if (!string.IsNullOrWhiteSpace(id))
+                    {
+                        productIds.Add(new ProductId { Id = id.Trim(), ProductType = ProductType.InApp });
+                    }
                 }
             }
-        }
 
-        var queryParams = new QueryProductDetailsParams { ProductIds = productIds };
-        var result = await _billingClient.QueryProductDetailsAsync(queryParams);
+            var queryParams = new QueryProductDetailsParams { ProductIds = productIds };
+            var result = await _billingClient.QueryProductDetailsAsync(queryParams);
+            if (this == null) return;
 
-        if (result.IsOk)
-        {
-            var detailsList = result.Value.ProductDetailsList;
-            if (detailsList != null && detailsList.Count > 0)
+            if (result.IsOk)
             {
-                _offerToken = null;
-                foreach (var product in detailsList)
+                var detailsList = result.Value.ProductDetailsList;
+                if (detailsList != null && detailsList.Count > 0)
                 {
-                    if (product.ProductOffers != null && product.ProductOffers.Count > 0)
+                    _offerToken = null;
+                    foreach (var product in detailsList)
                     {
-                        var offer = product.ProductOffers[0];
-                        if (string.IsNullOrEmpty(_offerToken))
+                        if (product.ProductOffers != null && product.ProductOffers.Count > 0)
                         {
-                            _offerToken = offer.OfferToken;
+                            var offer = product.ProductOffers[0];
+                            if (string.IsNullOrEmpty(_offerToken))
+                            {
+                                _offerToken = offer.OfferToken;
+                            }
+                            string discountInfo = offer.FullPriceMicros > 0
+                                ? $" (FullPriceMicros: {offer.FullPriceMicros})"
+                                : string.Empty;
+                            Log($"<color=green>Product Loaded: {product.Id} - {product.Title} ({offer.FormattedPrice}{discountInfo})</color>");
                         }
-                        string discountInfo = offer.FullPriceMicros > 0
-                            ? $" (FullPriceMicros: {offer.FullPriceMicros})"
-                            : string.Empty;
-                        Log($"<color=green>Product Loaded: {product.Id} - {product.Title} ({offer.FormattedPrice}{discountInfo})</color>");
+                        else
+                        {
+                            Log($"<color=yellow>Product '{product.Id}' ({product.Title}) has no active offers.</color>");
+                        }
                     }
-                    else
-                    {
-                        Log($"<color=yellow>Product '{product.Id}' ({product.Title}) has no active offers.</color>");
-                    }
-                }
 
-                if (_purchaseButton != null)
+                    SetButtonInteractable(_purchaseButton, !string.IsNullOrEmpty(_offerToken));
+                }
+                else
                 {
-                    _purchaseButton.interactable = !string.IsNullOrEmpty(_offerToken);
+                    Log("<color=yellow>QueryProductDetails succeeded, but 0 products matched the configured Product IDs.</color>");
                 }
             }
             else
             {
-                Log("<color=yellow>QueryProductDetails succeeded, but 0 products matched the configured Product IDs.</color>");
+                Log($"<color=red>QueryProductDetails failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
             }
         }
-        else
+        catch (Exception ex)
         {
-            Log($"<color=red>QueryProductDetails failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
+            if (this != null)
+            {
+                Log($"<color=red>QueryProducts threw exception: {ex.Message}</color>");
+            }
         }
-
-        _queryProductsButton.interactable = true;
+        finally
+        {
+            if (this != null)
+            {
+                SetButtonInteractable(_queryProductsButton, true);
+            }
+        }
     }
 
     // 3. IsBillingProgramAvailable
@@ -347,21 +397,36 @@ public class GameStoreManager : MonoBehaviour
         }
 
         Log($"Checking IsBillingProgramAvailable({_billingProgram})...");
-        _isBillingProgramAvailableButton.interactable = false;
-
-        var checkParams = new IsBillingProgramAvailableParams { BillingProgram = _billingProgram };
-        var result = await _billingClient.IsBillingProgramAvailableAsync(checkParams);
-
-        if (result.IsOk)
+        SetButtonInteractable(_isBillingProgramAvailableButton, false);
+        try
         {
-            Log($"<color=green>IsBillingProgramAvailable({_billingProgram}): Available={result.Value.IsBillingProgramAvailable}</color>");
-        }
-        else
-        {
-            Log($"<color=yellow>IsBillingProgramAvailable({_billingProgram}) not available: Code={result.Code}, Message={result.ErrorMessage}</color>");
-        }
+            var checkParams = new IsBillingProgramAvailableParams { BillingProgram = _billingProgram };
+            var result = await _billingClient.IsBillingProgramAvailableAsync(checkParams);
+            if (this == null) return;
 
-        _isBillingProgramAvailableButton.interactable = true;
+            if (result.IsOk)
+            {
+                Log($"<color=green>IsBillingProgramAvailable({_billingProgram}): Available={result.Value.IsBillingProgramAvailable}</color>");
+            }
+            else
+            {
+                Log($"<color=yellow>IsBillingProgramAvailable({_billingProgram}) not available: Code={result.Code}, Message={result.ErrorMessage}</color>");
+            }
+        }
+        catch (Exception ex)
+        {
+            if (this != null)
+            {
+                Log($"<color=red>CheckBillingProgramAvailable threw exception: {ex.Message}</color>");
+            }
+        }
+        finally
+        {
+            if (this != null)
+            {
+                SetButtonInteractable(_isBillingProgramAvailableButton, true);
+            }
+        }
     }
 
     // 4. CreateBillingProgramReportingDetails
@@ -374,21 +439,36 @@ public class GameStoreManager : MonoBehaviour
         }
 
         Log($"Calling CreateBillingProgramReportingDetails({_billingProgram})...");
-        _createReportingDetailsButton.interactable = false;
-
-        var reportParams = new CreateBillingProgramReportingDetailsParams { BillingProgram = _billingProgram };
-        var result = await _billingClient.CreateBillingProgramReportingDetailsAsync(reportParams);
-
-        if (result.IsOk)
+        SetButtonInteractable(_createReportingDetailsButton, false);
+        try
         {
-            Log($"<color=green>CreateBillingProgramReportingDetails succeeded! ExternalTransactionToken={result.Value.ReportingDetails}</color>");
-        }
-        else
-        {
-            Log($"<color=red>CreateBillingProgramReportingDetails failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
-        }
+            var reportParams = new CreateBillingProgramReportingDetailsParams { BillingProgram = _billingProgram };
+            var result = await _billingClient.CreateBillingProgramReportingDetailsAsync(reportParams);
+            if (this == null) return;
 
-        _createReportingDetailsButton.interactable = true;
+            if (result.IsOk)
+            {
+                Log($"<color=green>CreateBillingProgramReportingDetails succeeded! ExternalTransactionToken={RedactTokenForLog(result.Value.ReportingDetails)}</color>");
+            }
+            else
+            {
+                Log($"<color=red>CreateBillingProgramReportingDetails failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
+            }
+        }
+        catch (Exception ex)
+        {
+            if (this != null)
+            {
+                Log($"<color=red>CreateBillingProgramReportingDetails threw exception: {ex.Message}</color>");
+            }
+        }
+        finally
+        {
+            if (this != null)
+            {
+                SetButtonInteractable(_createReportingDetailsButton, true);
+            }
+        }
     }
 
     // 5. Launch Purchase Flow
@@ -401,43 +481,59 @@ public class GameStoreManager : MonoBehaviour
         }
 
         Log("Launching purchase flow...");
-        _purchaseButton.interactable = false;
-
-        var purchaseParams = new LaunchPurchaseFlowParams
+        SetButtonInteractable(_purchaseButton, false);
+        try
         {
-            OfferToken = _offerToken,
-            Quantity = 1
-        };
-
-        var result = await _billingClient.LaunchPurchaseFlowAsync(purchaseParams);
-        if (result.IsOk)
-        {
-            ProductPurchaseDetails details = result.Value.ProductPurchaseDetails;
-            if (details.PurchaseState == PurchaseState.Purchased)
+            var purchaseParams = new LaunchPurchaseFlowParams
             {
-                _lastPurchaseToken = details.PurchaseToken;
-                Log($"<color=green>Purchase completed! OrderId={details.OrderId}, ProductId={details.ProductId}, Qty={details.Quantity}, Ack={details.IsAcknowledged}</color>");
-                UpdatePurchaseActionButtons();
+                OfferToken = _offerToken,
+                Quantity = 1
+            };
+
+            var result = await _billingClient.LaunchPurchaseFlowAsync(purchaseParams);
+            if (this == null) return;
+
+            if (result.IsOk)
+            {
+                ProductPurchaseDetails details = result.Value.ProductPurchaseDetails;
+                if (details.PurchaseState == PurchaseState.Purchased)
+                {
+                    _lastPurchaseToken = details.PurchaseToken;
+                    Log($"<color=green>Purchase completed! OrderId={details.OrderId}, ProductId={details.ProductId}, Qty={details.Quantity}, Ack={details.IsAcknowledged}</color>");
+                    UpdatePurchaseActionButtons();
+                }
+                else if (details.PurchaseState == PurchaseState.Pending)
+                {
+                    Log($"<color=yellow>Purchase is PENDING external completion (ProductId={details.ProductId}). Do not grant entitlement until Purchased.</color>");
+                }
+                else
+                {
+                    Log($"<color=yellow>Purchase returned state {details.PurchaseState}.</color>");
+                }
             }
-            else if (details.PurchaseState == PurchaseState.Pending)
+            else if (result.Code == BillingError.UserCanceled)
             {
-                Log($"<color=yellow>Purchase is PENDING external completion (ProductId={details.ProductId}). Do not grant entitlement until Purchased.</color>");
+                Log("<color=yellow>Purchase canceled by user.</color>");
             }
             else
             {
-                Log($"<color=yellow>Purchase returned state {details.PurchaseState}.</color>");
+                Log($"<color=red>LaunchPurchaseFlow failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
             }
         }
-        else if (result.Code == BillingError.UserCanceled)
+        catch (Exception ex)
         {
-            Log("<color=yellow>Purchase canceled by user.</color>");
+            if (this != null)
+            {
+                Log($"<color=red>PurchaseItem threw exception: {ex.Message}</color>");
+            }
         }
-        else
+        finally
         {
-            Log($"<color=red>LaunchPurchaseFlow failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
+            if (this != null)
+            {
+                SetButtonInteractable(_purchaseButton, !string.IsNullOrEmpty(_offerToken));
+            }
         }
-
-        _purchaseButton.interactable = true;
     }
 
     // 6. Query Purchases (Purchase Restoration)
@@ -450,36 +546,52 @@ public class GameStoreManager : MonoBehaviour
         }
 
         Log("Querying owned/restored purchases...");
-        _queryPurchasesButton.interactable = false;
-
-        var result = await _billingClient.QueryPurchasesAsync();
-        if (result.IsOk)
+        SetButtonInteractable(_queryPurchasesButton, false);
+        try
         {
-            _knownPurchases.Clear();
-            var list = result.Value.ProductPurchaseDetails;
-            int count = list != null ? list.Count : 0;
-            Log($"<color=green>QueryPurchases succeeded: {count} purchase(s) found.</color>");
+            var result = await _billingClient.QueryPurchasesAsync();
+            if (this == null) return;
 
-            if (list != null)
+            if (result.IsOk)
             {
-                foreach (var purchase in list)
+                _knownPurchases.Clear();
+                var list = result.Value.ProductPurchaseDetails;
+                int count = list != null ? list.Count : 0;
+                Log($"<color=green>QueryPurchases succeeded: {count} purchase(s) found.</color>");
+
+                if (list != null)
                 {
-                    _knownPurchases.Add(purchase);
-                    Log($"  - ProductId={purchase.ProductId}, State={purchase.PurchaseState}, Ack={purchase.IsAcknowledged}, OrderId={purchase.OrderId}");
-                    if (purchase.PurchaseState == PurchaseState.Purchased && !string.IsNullOrEmpty(purchase.PurchaseToken))
+                    foreach (var purchase in list)
                     {
-                        _lastPurchaseToken = purchase.PurchaseToken;
+                        _knownPurchases.Add(purchase);
+                        Log($"  - ProductId={purchase.ProductId}, State={purchase.PurchaseState}, Ack={purchase.IsAcknowledged}, OrderId={purchase.OrderId}");
+                        if (purchase.PurchaseState == PurchaseState.Purchased && !string.IsNullOrEmpty(purchase.PurchaseToken))
+                        {
+                            _lastPurchaseToken = purchase.PurchaseToken;
+                        }
                     }
                 }
+                UpdatePurchaseActionButtons();
             }
-            UpdatePurchaseActionButtons();
+            else
+            {
+                Log($"<color=red>QueryPurchases failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            Log($"<color=red>QueryPurchases failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
+            if (this != null)
+            {
+                Log($"<color=red>QueryPurchases threw exception: {ex.Message}</color>");
+            }
         }
-
-        _queryPurchasesButton.interactable = true;
+        finally
+        {
+            if (this != null)
+            {
+                SetButtonInteractable(_queryPurchasesButton, true);
+            }
+        }
     }
 
     // 7. Acknowledge Purchase
@@ -492,21 +604,36 @@ public class GameStoreManager : MonoBehaviour
         }
 
         Log("Acknowledging purchase...");
-        _acknowledgePurchaseButton.interactable = false;
-
-        var ackParams = new AcknowledgePurchaseParams { PurchaseToken = _lastPurchaseToken };
-        var result = await _billingClient.AcknowledgePurchaseAsync(ackParams);
-
-        if (result.IsOk)
+        SetButtonInteractable(_acknowledgePurchaseButton, false);
+        try
         {
-            Log("<color=green>AcknowledgePurchase succeeded!</color>");
-        }
-        else
-        {
-            Log($"<color=red>AcknowledgePurchase failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
-        }
+            var ackParams = new AcknowledgePurchaseParams { PurchaseToken = _lastPurchaseToken };
+            var result = await _billingClient.AcknowledgePurchaseAsync(ackParams);
+            if (this == null) return;
 
-        UpdatePurchaseActionButtons();
+            if (result.IsOk)
+            {
+                Log("<color=green>AcknowledgePurchase succeeded!</color>");
+            }
+            else
+            {
+                Log($"<color=red>AcknowledgePurchase failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
+            }
+        }
+        catch (Exception ex)
+        {
+            if (this != null)
+            {
+                Log($"<color=red>AcknowledgePurchase threw exception: {ex.Message}</color>");
+            }
+        }
+        finally
+        {
+            if (this != null)
+            {
+                UpdatePurchaseActionButtons();
+            }
+        }
     }
 
     // 8. Consume Purchase
@@ -519,23 +646,38 @@ public class GameStoreManager : MonoBehaviour
         }
 
         Log("Consuming purchase...");
-        _consumePurchaseButton.interactable = false;
-
-        string tokenToConsume = _lastPurchaseToken;
-        var consumeParams = new ConsumePurchaseParams { PurchaseToken = tokenToConsume };
-        var result = await _billingClient.ConsumePurchaseAsync(consumeParams);
-
-        if (result.IsOk)
+        SetButtonInteractable(_consumePurchaseButton, false);
+        try
         {
-            Log("<color=green>ConsumePurchase succeeded! Item can now be purchased again.</color>");
-            _lastPurchaseToken = null;
-        }
-        else
-        {
-            Log($"<color=red>ConsumePurchase failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
-        }
+            string tokenToConsume = _lastPurchaseToken;
+            var consumeParams = new ConsumePurchaseParams { PurchaseToken = tokenToConsume };
+            var result = await _billingClient.ConsumePurchaseAsync(consumeParams);
+            if (this == null) return;
 
-        UpdatePurchaseActionButtons();
+            if (result.IsOk)
+            {
+                Log("<color=green>ConsumePurchase succeeded! Item can now be purchased again.</color>");
+                _lastPurchaseToken = null;
+            }
+            else
+            {
+                Log($"<color=red>ConsumePurchase failed! Code={result.Code}, Message={result.ErrorMessage}</color>");
+            }
+        }
+        catch (Exception ex)
+        {
+            if (this != null)
+            {
+                Log($"<color=red>ConsumePurchase threw exception: {ex.Message}</color>");
+            }
+        }
+        finally
+        {
+            if (this != null)
+            {
+                UpdatePurchaseActionButtons();
+            }
+        }
     }
 
     // 9. Prepare Integrity Token
@@ -553,23 +695,38 @@ public class GameStoreManager : MonoBehaviour
         }
 
         Log("Preparing Play Integrity token...");
-        _integrityButton.interactable = false;
-
-        var prepareParams = new PrepareIntegrityTokenParams { CloudProjectNumber = _cloudProjectNumber };
-        var prepareResult = await _integrityClient.PrepareIntegrityTokenAsync(prepareParams);
-
-        if (prepareResult.IsOk)
+        SetButtonInteractable(_integrityButton, false);
+        try
         {
-            _preparedRequestTokenData = prepareResult.Value.RequestTokenData;
-            Log("<color=green>PrepareIntegrityToken succeeded! Ready to request integrity token.</color>");
-            if (_requestIntegrityButton != null) _requestIntegrityButton.interactable = true;
-        }
-        else
-        {
-            Log($"<color=red>PrepareIntegrityToken failed! Code={prepareResult.Code}, Message={prepareResult.ErrorMessage}</color>");
-        }
+            var prepareParams = new PrepareIntegrityTokenParams { CloudProjectNumber = _cloudProjectNumber };
+            var prepareResult = await _integrityClient.PrepareIntegrityTokenAsync(prepareParams);
+            if (this == null) return;
 
-        _integrityButton.interactable = true;
+            if (prepareResult.IsOk)
+            {
+                _preparedRequestTokenData = prepareResult.Value.RequestTokenData;
+                Log("<color=green>PrepareIntegrityToken succeeded! Ready to request integrity token.</color>");
+                SetButtonInteractable(_requestIntegrityButton, true);
+            }
+            else
+            {
+                Log($"<color=red>PrepareIntegrityToken failed! Code={prepareResult.Code}, Message={prepareResult.ErrorMessage}</color>");
+            }
+        }
+        catch (Exception ex)
+        {
+            if (this != null)
+            {
+                Log($"<color=red>PrepareIntegrityToken threw exception: {ex.Message}</color>");
+            }
+        }
+        finally
+        {
+            if (this != null)
+            {
+                SetButtonInteractable(_integrityButton, true);
+            }
+        }
     }
 
     // 10. Request Integrity Token (with cryptographic SHA-256 RequestHash)
@@ -582,28 +739,44 @@ public class GameStoreManager : MonoBehaviour
         }
 
         Log("Requesting Play Integrity token with SHA-256 requestHash...");
-        _requestIntegrityButton.interactable = false;
-
-        _cachedRequestHash = ComputeIntegrityRequestHash(_packageName, "unity_verify_integrity");
-        var requestParams = new RequestIntegrityTokenParams
+        SetButtonInteractable(_requestIntegrityButton, false);
+        try
         {
-            RequestTokenData = _preparedRequestTokenData.Value,
-            RequestHash = _cachedRequestHash
-        };
+            _cachedRequestHash = ComputeIntegrityRequestHash(_packageName, "unity_verify_integrity");
+            var requestParams = new RequestIntegrityTokenParams
+            {
+                RequestTokenData = _preparedRequestTokenData.Value,
+                RequestHash = _cachedRequestHash
+            };
 
-        var requestResult = await _integrityClient.RequestIntegrityTokenAsync(requestParams);
-        if (requestResult.IsOk)
-        {
-            _lastIntegrityToken = requestResult.Value.TokenBytes;
-            Log($"<color=green>RequestIntegrityToken succeeded! Token length={_lastIntegrityToken.Length}, SHA-256 hash={_cachedRequestHash}</color>");
-            if (_verifyIntegrityButton != null) _verifyIntegrityButton.interactable = true;
+            var requestResult = await _integrityClient.RequestIntegrityTokenAsync(requestParams);
+            if (this == null) return;
+
+            if (requestResult.IsOk)
+            {
+                _lastIntegrityToken = requestResult.Value.TokenBytes;
+                Log($"<color=green>RequestIntegrityToken succeeded! Token length={_lastIntegrityToken.Length}, SHA-256 hash={_cachedRequestHash}</color>");
+                SetButtonInteractable(_verifyIntegrityButton, true);
+            }
+            else
+            {
+                Log($"<color=red>RequestIntegrityToken failed! Code={requestResult.Code}, Message={requestResult.ErrorMessage}</color>");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            Log($"<color=red>RequestIntegrityToken failed! Code={requestResult.Code}, Message={requestResult.ErrorMessage}</color>");
+            if (this != null)
+            {
+                Log($"<color=red>RequestIntegrityToken threw exception: {ex.Message}</color>");
+            }
         }
-
-        _requestIntegrityButton.interactable = true;
+        finally
+        {
+            if (this != null)
+            {
+                SetButtonInteractable(_requestIntegrityButton, true);
+            }
+        }
     }
 
     // 11. Verify Integrity Token (via api-server)
@@ -624,54 +797,86 @@ public class GameStoreManager : MonoBehaviour
 
         string verifyUrl = baseUrl + "/api/verifyIntegrityToken";
         Log($"Verifying integrity token via {verifyUrl}...");
-        _verifyIntegrityButton.interactable = false;
-
-        string jsonBody = JsonUtility.ToJson(new VerifyIntegrityRequest
+        SetButtonInteractable(_verifyIntegrityButton, false);
+        try
         {
-            packageName = _packageName,
-            token = _lastIntegrityToken
-        });
-
-        using (var request = new UnityWebRequest(verifyUrl, UnityWebRequest.kHttpVerbPOST))
-        {
-            byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
-            request.uploadHandler = new UploadHandlerRaw(bodyRaw);
-            request.downloadHandler = new DownloadHandlerBuffer();
-            request.SetRequestHeader("Content-Type", "application/json");
-
-            var op = request.SendWebRequest();
-            while (!op.isDone)
+            string jsonBody = JsonUtility.ToJson(new VerifyIntegrityRequest
             {
-                await Task.Yield();
+                packageName = _packageName,
+                token = _lastIntegrityToken
+            });
+
+            string authToken = Environment.GetEnvironmentVariable("API_AUTH_TOKEN");
+            if (string.IsNullOrWhiteSpace(authToken))
+            {
+                authToken = _apiAuthToken;
             }
 
-            if (request.result != UnityWebRequest.Result.Success)
+            using (var request = new UnityWebRequest(verifyUrl, UnityWebRequest.kHttpVerbPOST))
             {
-                Log($"<color=red>Backend HTTP error ({request.responseCode}): {request.error}</color>");
-            }
-            else
-            {
-                VerifyIntegrityResponse parsed = JsonUtility.FromJson<VerifyIntegrityResponse>(request.downloadHandler.text);
-                if (parsed != null && parsed.result)
+                byte[] bodyRaw = Encoding.UTF8.GetBytes(jsonBody);
+                request.uploadHandler = new UploadHandlerRaw(bodyRaw);
+                request.downloadHandler = new DownloadHandlerBuffer();
+                request.SetRequestHeader("Content-Type", "application/json");
+                if (!string.IsNullOrWhiteSpace(authToken))
                 {
-                    if (parsed.hash == _cachedRequestHash)
+                    request.SetRequestHeader("Authorization", "Bearer " + authToken.Trim());
+                }
+
+                var op = request.SendWebRequest();
+                while (!op.isDone)
+                {
+                    await Task.Yield();
+                    if (this == null) return;
+                }
+
+                if (request.result != UnityWebRequest.Result.Success)
+                {
+                    if (request.responseCode == 401)
                     {
-                        Log("<color=green>VerifyIntegrityToken succeeded! MEETS_PC_INTEGRITY & SHA-256 requestHash verified.</color>");
+                        Log("<color=red>Backend HTTP error (401 Unauthorized): Set API_AUTH_TOKEN env var (or _apiAuthToken) to a valid Firebase Auth ID token.</color>");
                     }
                     else
                     {
-                        Log($"<color=red>VerifyIntegrityToken hash mismatch! Expected={_cachedRequestHash}, Received={parsed.hash}</color>");
+                        Log($"<color=red>Backend HTTP error ({request.responseCode}): {request.error}</color>");
                     }
                 }
                 else
                 {
-                    string err = parsed != null ? parsed.error : request.downloadHandler.text;
-                    Log($"<color=red>VerifyIntegrityToken rejected: {err}</color>");
+                    VerifyIntegrityResponse parsed = JsonUtility.FromJson<VerifyIntegrityResponse>(request.downloadHandler.text);
+                    if (parsed != null && parsed.result)
+                    {
+                        if (parsed.hash == _cachedRequestHash)
+                        {
+                            Log("<color=green>VerifyIntegrityToken succeeded! MEETS_PC_INTEGRITY & SHA-256 requestHash verified.</color>");
+                        }
+                        else
+                        {
+                            Log($"<color=red>VerifyIntegrityToken hash mismatch! Expected={_cachedRequestHash}, Received={parsed.hash}</color>");
+                        }
+                    }
+                    else
+                    {
+                        string err = parsed != null ? parsed.error : request.downloadHandler.text;
+                        Log($"<color=red>VerifyIntegrityToken rejected: {err}</color>");
+                    }
                 }
             }
         }
-
-        _verifyIntegrityButton.interactable = true;
+        catch (Exception ex)
+        {
+            if (this != null)
+            {
+                Log($"<color=red>VerifyIntegrityToken threw exception: {ex.Message}</color>");
+            }
+        }
+        finally
+        {
+            if (this != null)
+            {
+                SetButtonInteractable(_verifyIntegrityButton, true);
+            }
+        }
     }
 
     private static string ComputeIntegrityRequestHash(string packageName, string action)

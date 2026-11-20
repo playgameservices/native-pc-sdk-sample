@@ -7,6 +7,7 @@
 #include <windows.h>
 
 #include <algorithm>
+#include <atomic>
 #include <format>
 #include <functional>
 #include <future>
@@ -29,6 +30,7 @@
 #include <integrity/client.h>
 #include <integrity/enums.h>
 #include <integrity/models.h>
+#include <restclient-cpp/connection.h>
 #include <restclient-cpp/restclient.h>
 
 #include "GameAppGenericClasses.hpp"
@@ -241,6 +243,19 @@ class GameAppBillingSdkDialog {
     mUiState->pendingCallback = nullptr;
   }
 
+  // Ensures an async SDK continuation settles its std::promise at most once,
+  // preventing std::future_error if a callback were ever invoked more than once.
+  template <typename T>
+  static void SetPromiseOnce(
+      const std::shared_ptr<std::promise<T>>& promise,
+      const std::shared_ptr<std::atomic_bool>& settled,
+      T&& value) {
+    bool expected = false;
+    if (settled && settled->compare_exchange_strong(expected, true)) {
+      promise->set_value(std::move(value));
+    }
+  }
+
   std::string GetBillingErrorDescription(BillingError err) const {
     auto it = sdkErrorMsg.find(err);
     if (it != sdkErrorMsg.end()) {
@@ -336,7 +351,7 @@ class GameAppBillingSdkDialog {
     }
 
     auto uiState = mUiState;
-    std::thread([uiState, work = std::move(backgroundWork)]() {
+    std::thread([this, uiState, work = std::move(backgroundWork)]() {
       std::function<void()> uiCompletion;
       try {
         uiCompletion = work();
@@ -344,7 +359,7 @@ class GameAppBillingSdkDialog {
         std::string errMsg =
             std::string("Unhandled exception in async worker: ") + ex.what();
         GameLogging::Error(errMsg);
-        uiCompletion = [errMsg]() { GameLogging::Error(errMsg); };
+        uiCompletion = [this, errMsg]() { SetResultText(errMsg); };
       }
 
       std::lock_guard<std::mutex> lock(uiState->mtx);
@@ -425,6 +440,13 @@ class GameAppBillingSdkDialog {
           pThis->InvalidateUiState();
         }
         EndDialog(hwndDlg, 0);
+        return TRUE;
+      }
+
+      case WM_DESTROY: {
+        if (pThis != nullptr) {
+          pThis->InvalidateUiState();
+        }
         return TRUE;
       }
 
@@ -751,14 +773,15 @@ class GameAppBillingSdkDialog {
 
     RunAsyncOperation([this, pkgName]() -> std::function<void()> {
       auto promise = std::make_shared<std::promise<InitializeResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
       GooglePlayInitializeParams initParams;
       if (!pkgName.empty() && pkgName != "your-package-id") {
         initParams.package_name = pkgName;
       }
 
       GooglePlayInitialize(
-          [promise](InitializeResult result) {
-            promise->set_value(std::move(result));
+          [promise, settled](InitializeResult result) {
+            SetPromiseOnce(promise, settled, std::move(result));
           },
           initParams);
 
@@ -871,9 +894,10 @@ class GameAppBillingSdkDialog {
         [this, client, queryParams, sProdID]() -> std::function<void()> {
           auto promise =
               std::make_shared<std::promise<QueryProductDetailsResult>>();
+          auto settled = std::make_shared<std::atomic_bool>(false);
           client->QueryProductDetails(
-              queryParams, [promise](QueryProductDetailsResult r) {
-                promise->set_value(std::move(r));
+              queryParams, [promise, settled](QueryProductDetailsResult r) {
+                SetPromiseOnce(promise, settled, std::move(r));
               });
           QueryProductDetailsResult res = promise->get_future().get();
 
@@ -969,9 +993,10 @@ class GameAppBillingSdkDialog {
         [this, client, param, program]() -> std::function<void()> {
           auto promise =
               std::make_shared<std::promise<IsBillingProgramAvailableResult>>();
+          auto settled = std::make_shared<std::atomic_bool>(false);
           client->IsBillingProgramAvailable(
-              param, [promise](IsBillingProgramAvailableResult r) {
-                promise->set_value(std::move(r));
+              param, [promise, settled](IsBillingProgramAvailableResult r) {
+                SetPromiseOnce(promise, settled, std::move(r));
               });
           IsBillingProgramAvailableResult res = promise->get_future().get();
 
@@ -1015,9 +1040,11 @@ class GameAppBillingSdkDialog {
     RunAsyncOperation([this, client, params, program]() -> std::function<void()> {
       auto promise = std::make_shared<
           std::promise<CreateBillingProgramReportingDetailsResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
       client->CreateBillingProgramReportingDetails(
-          params, [promise](CreateBillingProgramReportingDetailsResult r) {
-            promise->set_value(std::move(r));
+          params,
+          [promise, settled](CreateBillingProgramReportingDetailsResult r) {
+            SetPromiseOnce(promise, settled, std::move(r));
           });
       CreateBillingProgramReportingDetailsResult res =
           promise->get_future().get();
@@ -1037,7 +1064,7 @@ class GameAppBillingSdkDialog {
           msg << "CreateBillingProgramReportingDetails succeeded!\r\n"
               << "Program: " << BillingProgramToString(program) << "\r\n"
               << "external_transaction_token: "
-              << mLastExternalTransactionToken;
+              << RedactTokenForLog(mLastExternalTransactionToken);
           GameLogging::Info(msg.str());
         }
         SetResultText(msg.str());
@@ -1073,9 +1100,10 @@ class GameAppBillingSdkDialog {
     auto client = mBillingClient;
     RunAsyncOperation([this, client, flowParams]() -> std::function<void()> {
       auto promise = std::make_shared<std::promise<LaunchPurchaseFlowResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
       client->LaunchPurchaseFlow(flowParams,
-                                 [promise](LaunchPurchaseFlowResult r) {
-                                   promise->set_value(std::move(r));
+                                 [promise, settled](LaunchPurchaseFlowResult r) {
+                                   SetPromiseOnce(promise, settled, std::move(r));
                                  });
       LaunchPurchaseFlowResult res = promise->get_future().get();
 
@@ -1107,7 +1135,7 @@ class GameAppBillingSdkDialog {
             << "  quantity: " << purchase.quantity << "\r\n"
             << "  is_acknowledged: "
             << (purchase.is_acknowledged ? "true" : "false") << "\r\n"
-            << "  purchase_token: " << purchase.purchase_token;
+            << "  purchase_token: " << RedactTokenForLog(purchase.purchase_token);
 
         if (purchase.purchase_state == PurchaseState::kPurchaseStatePending) {
           out << "\r\n\r\nNOTE: Purchase is PENDING. Do not grant entitlement "
@@ -1134,8 +1162,9 @@ class GameAppBillingSdkDialog {
     auto client = mBillingClient;
     RunAsyncOperation([this, client]() -> std::function<void()> {
       auto promise = std::make_shared<std::promise<QueryPurchasesResult>>();
-      client->QueryPurchases([promise](QueryPurchasesResult r) {
-        promise->set_value(std::move(r));
+      auto settled = std::make_shared<std::atomic_bool>(false);
+      client->QueryPurchases([promise, settled](QueryPurchasesResult r) {
+        SetPromiseOnce(promise, settled, std::move(r));
       });
       QueryPurchasesResult res = promise->get_future().get();
 
@@ -1164,7 +1193,7 @@ class GameAppBillingSdkDialog {
               << " | ack: " << (p.is_acknowledged ? "true" : "false")
               << " | qty: " << p.quantity
               << "\r\n    order_id: " << p.order_id
-              << "\r\n    token: " << p.purchase_token;
+              << "\r\n    token: " << RedactTokenForLog(p.purchase_token);
         }
         GameLogging::Info(out.str());
         SetResultText(out.str());
@@ -1199,9 +1228,10 @@ class GameAppBillingSdkDialog {
         [this, client, ackParams, sPurchaseToken]() -> std::function<void()> {
           auto promise =
               std::make_shared<std::promise<AcknowledgePurchaseResult>>();
+          auto settled = std::make_shared<std::atomic_bool>(false);
           client->AcknowledgePurchase(
-              ackParams, [promise](AcknowledgePurchaseResult r) {
-                promise->set_value(std::move(r));
+              ackParams, [promise, settled](AcknowledgePurchaseResult r) {
+                SetPromiseOnce(promise, settled, std::move(r));
               });
           AcknowledgePurchaseResult res = promise->get_future().get();
 
@@ -1226,7 +1256,7 @@ class GameAppBillingSdkDialog {
 
             std::string msg =
                 "Successfully acknowledged purchase.\r\npurchase_token: " +
-                sPurchaseToken;
+                RedactTokenForLog(sPurchaseToken);
             GameLogging::Info(msg);
             SetResultText(msg);
             SetForegroundWindow(m_hWnd);
@@ -1259,9 +1289,10 @@ class GameAppBillingSdkDialog {
     RunAsyncOperation([this, client, consumeParams,
                        sPurchaseToken]() -> std::function<void()> {
       auto promise = std::make_shared<std::promise<ConsumePurchaseResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
       client->ConsumePurchase(consumeParams,
-                              [promise](ConsumePurchaseResult r) {
-                                promise->set_value(std::move(r));
+                              [promise, settled](ConsumePurchaseResult r) {
+                                SetPromiseOnce(promise, settled, std::move(r));
                               });
       ConsumePurchaseResult res = promise->get_future().get();
 
@@ -1281,7 +1312,7 @@ class GameAppBillingSdkDialog {
         RemoveKnownPurchase(sPurchaseToken);
         std::string msg =
             "Successfully consumed purchase.\r\npurchase_token: " +
-            sPurchaseToken;
+            RedactTokenForLog(sPurchaseToken);
         GameLogging::Info(msg);
         SetResultText(msg);
         SetForegroundWindow(m_hWnd);
@@ -1317,9 +1348,10 @@ class GameAppBillingSdkDialog {
     RunAsyncOperation([this, integrityClient, param]() -> std::function<void()> {
       auto promise =
           std::make_shared<std::promise<PrepareIntegrityTokenResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
       integrityClient->PrepareIntegrityToken(
-          param, [promise](PrepareIntegrityTokenResult r) {
-            promise->set_value(std::move(r));
+          param, [promise, settled](PrepareIntegrityTokenResult r) {
+            SetPromiseOnce(promise, settled, std::move(r));
           });
       PrepareIntegrityTokenResult res = promise->get_future().get();
 
@@ -1365,9 +1397,10 @@ class GameAppBillingSdkDialog {
     RunAsyncOperation([this, integrityClient, param]() -> std::function<void()> {
       auto promise =
           std::make_shared<std::promise<RequestIntegrityTokenResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
       integrityClient->RequestIntegrityToken(
-          param, [promise](RequestIntegrityTokenResult r) {
-            promise->set_value(std::move(r));
+          param, [promise, settled](RequestIntegrityTokenResult r) {
+            SetPromiseOnce(promise, settled, std::move(r));
           });
       RequestIntegrityTokenResult res = promise->get_future().get();
 
@@ -1382,14 +1415,11 @@ class GameAppBillingSdkDialog {
         }
 
         mRequestIntegrityTokenResValue.emplace(result.value());
-        std::string preview =
-            mRequestIntegrityTokenResValue->token_bytes.substr(
-                0, (std::min<size_t>)(
-                       32, mRequestIntegrityTokenResValue->token_bytes.size()));
         std::ostringstream out;
         out << "RequestIntegrityToken completed successfully.\r\n"
             << "SHA-256 request_hash: " << mCachedRequestHash << "\r\n"
-            << "Token preview: " << preview << "...";
+            << "Token: "
+            << RedactTokenForLog(mRequestIntegrityTokenResValue->token_bytes);
         GameLogging::Info(out.str());
         SetResultText(out.str());
       };
@@ -1409,19 +1439,42 @@ class GameAppBillingSdkDialog {
     jsonPayload["packageName"] = manifest.App.PackageName;
     jsonPayload["token"] = mRequestIntegrityTokenResValue->token_bytes;
     std::string payload = jsonPayload.dump();
-    std::string url =
-        manifest.App.backendBaseUrl + "/api/verifyIntegrityToken";
+    std::string baseUrl = manifest.App.backendBaseUrl;
+    std::string url = baseUrl + "/api/verifyIntegrityToken";
     std::string expectedHash = mCachedRequestHash;
+    std::string apiAuthToken = TrimAsciiWhitespace(GetEnvVarString("API_AUTH_TOKEN"));
+    if (apiAuthToken.empty()) {
+      apiAuthToken = manifest.App.apiAuthToken;
+    }
 
     SetResultText("Verifying integrity token via " + url + "...");
     GameLogging::Info("POST " + url);
 
     RunAsyncOperation(
-        [this, url, payload, expectedHash]() -> std::function<void()> {
+        [this, baseUrl, payload, expectedHash,
+         apiAuthToken]() -> std::function<void()> {
+          static std::once_flag restClientInitOnce;
+          std::call_once(restClientInitOnce, []() { RestClient::init(); });
+
+          RestClient::Connection conn(baseUrl);
+          conn.AppendHeader("Content-Type", "application/json");
+          if (!apiAuthToken.empty()) {
+            conn.AppendHeader("Authorization", "Bearer " + apiAuthToken);
+          }
           RestClient::Response response =
-              RestClient::post(url, "application/json", payload);
+              conn.post("/api/verifyIntegrityToken", payload);
 
           return [this, response, expectedHash]() {
+            if (response.code == 401) {
+              std::string errMsg =
+                  "Backend HTTP Error: 401 Unauthorized.\r\n"
+                  "Set the API_AUTH_TOKEN environment variable (or "
+                  "<ApiAuthToken> in manifest.local.xml) to a valid Firebase "
+                  "Auth ID token.";
+              GameLogging::Error(errMsg);
+              SetResultText(errMsg);
+              return;
+            }
             if (response.code != 200) {
               std::string errMsg =
                   "Backend HTTP Error: " + std::to_string(response.code);

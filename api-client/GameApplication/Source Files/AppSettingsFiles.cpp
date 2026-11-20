@@ -3,33 +3,38 @@
 #include "AppSettingsFiles.h"
 #include "..\Resource.h"
 #include <wtypes.h>
-using namespace System::Security::Cryptography;
 
+using namespace System::Security::Cryptography;
 using namespace System::Net::NetworkInformation;
 using namespace System::Reflection;
 using namespace System;
 using namespace System::Xml;
 using namespace System::IO;
-using namespace System;
 
 namespace GameApplication {
 
     AppSettingsFiles::AppSettingsFiles()
     {
         mBackendBaseUrl = "";
+        mApiAuthToken = "";
         ParseManifestXml();
         GetLocalIPAddress();
 
+        String^ envApiAuthToken = Environment::GetEnvironmentVariable("API_AUTH_TOKEN");
+        if (!String::IsNullOrWhiteSpace(envApiAuthToken)) {
+            mApiAuthToken = envApiAuthToken->Trim();
+        }
+
         String^ exeDir = Path::GetDirectoryName(Assembly::GetExecutingAssembly()->Location);
         array<String^>^ cfgCandidates = gcnew array<String^>{
-            "AppConfig.local.json",
             "Resource Files\\AppConfig.local.json",
             Path::Combine(exeDir, "AppConfig.local.json"),
             Path::Combine(exeDir, "AppConfig.json"),
             "Resource Files\\AppConfig.json",
+            "AppConfig.local.json",
             "AppConfig.json"
         };
-        String^ chosenCfg = "AppConfig.json";
+        String^ chosenCfg = "Resource Files\\AppConfig.json";
         for each (String^ c in cfgCandidates) {
             if (File::Exists(c)) {
                 chosenCfg = c;
@@ -39,12 +44,8 @@ namespace GameApplication {
         mConfig = ReadConfig(chosenCfg);
         if (mConfig != nullptr) {
             String^ envClientId = Environment::GetEnvironmentVariable("GOOGLE_OAUTH_CLIENT_ID");
-            if (!String::IsNullOrEmpty(envClientId)) {
-                mConfig->client_id = envClientId;
-            }
-            String^ envClientSecret = Environment::GetEnvironmentVariable("GOOGLE_OAUTH_CLIENT_SECRET");
-            if (!String::IsNullOrEmpty(envClientSecret)) {
-                mConfig->client_secret = envClientSecret;
+            if (!String::IsNullOrWhiteSpace(envClientId)) {
+                mConfig->client_id = envClientId->Trim();
             }
         }
 
@@ -53,7 +54,7 @@ namespace GameApplication {
             "Resource Files\\GameApis.json",
             "GameApis.json"
         };
-        String^ chosenApis = "GameApis.json";
+        String^ chosenApis = "Resource Files\\GameApis.json";
         for each (String^ c in apiCandidates) {
             if (File::Exists(c)) {
                 chosenApis = c;
@@ -84,14 +85,14 @@ namespace GameApplication {
         try {
             String^ exeDir = Path::GetDirectoryName(Assembly::GetExecutingAssembly()->Location);
             array<String^>^ manifestCandidates = gcnew array<String^>{
-                "manifest.local.xml",
                 "Resource Files\\manifest.local.xml",
                 Path::Combine(exeDir, "manifest.local.xml"),
                 Path::Combine(exeDir, "manifest.xml"),
                 "Resource Files\\manifest.xml",
+                "manifest.local.xml",
                 "manifest.xml"
             };
-            String^ chosenManifest = "manifest.xml";
+            String^ chosenManifest = "Resource Files\\manifest.xml";
             for each (String^ c in manifestCandidates) {
                 if (File::Exists(c)) {
                     chosenManifest = c;
@@ -99,25 +100,32 @@ namespace GameApplication {
                 }
             }
             XmlReader^ reader = XmlReader::Create(chosenManifest);
-            while (reader->Read()) {
-                if (reader->NodeType == XmlNodeType::Element) {
-                    String^ elementName = reader->Name;
-                    if (reader->Read() && reader->NodeType == XmlNodeType::Text) {
-                        if (elementName == "PackageName") {
-                            mPackageName = reader->Value->Trim();
-                        }
-                        if (elementName == "SKU") {
-                            String^ rawSku = reader->Value->Trim();
-                            int commaIdx = rawSku->IndexOf(',');
-                            mSku = (commaIdx > 0) ? rawSku->Substring(0, commaIdx)->Trim() : rawSku;
-                        }
-                        if (elementName == "BackendBaseUrl") {
-                            mBackendBaseUrl = reader->Value->Trim();
+            try {
+                while (reader->Read()) {
+                    if (reader->NodeType == XmlNodeType::Element) {
+                        String^ elementName = reader->Name;
+                        if (reader->Read() && reader->NodeType == XmlNodeType::Text) {
+                            if (elementName == "PackageName") {
+                                mPackageName = reader->Value->Trim();
+                            }
+                            if (elementName == "SKU") {
+                                String^ rawSku = reader->Value->Trim();
+                                int commaIdx = rawSku->IndexOf(',');
+                                mSku = (commaIdx > 0) ? rawSku->Substring(0, commaIdx)->Trim() : rawSku;
+                            }
+                            if (elementName == "BackendBaseUrl") {
+                                mBackendBaseUrl = reader->Value->Trim();
+                            }
+                            if (elementName == "ApiAuthToken") {
+                                mApiAuthToken = reader->Value->Trim();
+                            }
                         }
                     }
                 }
             }
-            reader->Close();
+            finally {
+                reader->Close();
+            }
             Console::WriteLine("PackageName: {0}, Sku: {1}", mPackageName, mSku);
         }
         catch (Exception^ ex)
@@ -158,9 +166,12 @@ namespace GameApplication {
     String^ AppSettingsFiles::ReadFile(String^ filePath) {
         try {
             StreamReader^ reader = gcnew StreamReader(filePath);
-            String^ content = reader->ReadToEnd();
-            reader->Close();
-            return content;
+            try {
+                return reader->ReadToEnd();
+            }
+            finally {
+                reader->Close();
+            }
         }
         catch (Exception^ ex) {
             Console::WriteLine("AppSettingsFiles::ReadFile - error occurred while reading the file: {0}", ex->Message);
@@ -187,7 +198,6 @@ namespace GameApplication {
     {
         Config^ config = nullptr;
         try {
-            //fileName = "GameApplication.Resources.AppConfig.json";
             String^ fileData = ReadFile(fileName);
             MemoryStream^ stream = gcnew MemoryStream(System::Text::Encoding::UTF8->GetBytes(fileData));
             DataContractJsonSerializer^ serializer = gcnew DataContractJsonSerializer(Config::typeid);
@@ -198,19 +208,30 @@ namespace GameApplication {
         }
         return config;
     }
-    //PKCE Functions start
+
     String^ AppSettingsFiles::GenerateRandomBase64Url(int length)
     {
         array<Byte>^ randomBytes = gcnew array<Byte>(length);
         RNGCryptoServiceProvider^ rng = gcnew RNGCryptoServiceProvider();
-        rng->GetBytes(randomBytes);
+        try {
+            rng->GetBytes(randomBytes);
+        }
+        finally {
+            delete rng;
+        }
         return Base64UrlEncodeNoPadding(randomBytes);
     }
+
     array<Byte>^ AppSettingsFiles::ComputeSha256(String^ input)
     {
         SHA256^ sha256 = SHA256::Create();
-        array<Byte>^ inputBytes = Encoding::UTF8->GetBytes(input);
-        return sha256->ComputeHash(inputBytes);
+        try {
+            array<Byte>^ inputBytes = Encoding::UTF8->GetBytes(input);
+            return sha256->ComputeHash(inputBytes);
+        }
+        finally {
+            delete sha256;
+        }
     }
 
     String^ AppSettingsFiles::Base64UrlEncodeNoPadding(array<Byte>^ bytes)

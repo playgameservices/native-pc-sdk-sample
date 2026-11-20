@@ -198,8 +198,33 @@ struct Manifest {
     std::vector<std::string> skuList;
     int64_t cloudProjectNumber = 0;
     std::string backendBaseUrl = "https://your-project.web.app";
+    std::string apiAuthToken;
   } App;
 };
+
+inline std::string RedactTokenForLog(const std::string& token) {
+  if (token.empty()) {
+    return "(empty)";
+  }
+  return "<redacted:" + std::to_string(token.size()) + " chars>";
+}
+
+inline std::string GetEnvVarString(const char* name) {
+  if (name == nullptr) {
+    return "";
+  }
+  DWORD required = GetEnvironmentVariableA(name, nullptr, 0);
+  if (required <= 1) {
+    return "";
+  }
+  std::string value(required - 1, '\0');
+  DWORD written = GetEnvironmentVariableA(name, value.data(), required);
+  if (written == 0) {
+    return "";
+  }
+  value.resize(written);
+  return value;
+}
 
 inline std::string TrimAsciiWhitespace(const std::string& s) {
   const size_t start = s.find_first_not_of(" \t\r\n");
@@ -314,6 +339,13 @@ inline bool ParseXmlFile(const std::string& filePath, Manifest& manifest) {
   }
   if (!baseUrl.empty()) {
     manifest.App.backendBaseUrl = baseUrl;
+  }
+
+  manifest.App.apiAuthToken =
+      TrimAsciiWhitespace(GetChildElementText(appElem, "ApiAuthToken"));
+  std::string envAuthToken = TrimAsciiWhitespace(GetEnvVarString("API_AUTH_TOKEN"));
+  if (!envAuthToken.empty()) {
+    manifest.App.apiAuthToken = envAuthToken;
   }
 
   return true;

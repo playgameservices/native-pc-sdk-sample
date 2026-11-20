@@ -164,9 +164,12 @@ node .agents/skills/setup-native-pc-sdk-sample/scripts/configure_local.mjs \
 
 The script writes BOM-free UTF-8 files exclusively to gitignored locations
 (`api-server/functions/.env`, `sdk-client/GameApplication/manifest.local.xml`,
-and `api-client/GameApplication/{,Resource Files/}{manifest.local.xml,AppConfig.local.json}`)
-and verifies every written path with `git check-ignore` so `git status` remains
-clean.
+and `api-client/GameApplication/Resource Files/{manifest.local.xml,AppConfig.local.json}`)
+without writing `client_secret` to disk, and verifies every written path with
+`git check-ignore` so `git status` remains clean. Set `API_AUTH_TOKEN` (a valid
+Firebase Auth ID token) in your environment before invoking `api-server`
+endpoints, and set `GOOGLE_OAUTH_CLIENT_SECRET` in your environment before
+running `api-client` `Google Login`.
 
 ---
 
@@ -174,12 +177,13 @@ clean.
 
 ### 4A. Deploy & Verify `api-server` (Node.js 22 Firebase Functions)
 
-1. Install dependencies, lint, and compile TypeScript:
+1. Install dependencies, lint, build, and run unit tests:
    ```bash
    cd api-server/functions
    npm install
    npm run lint
    npm run build
+   npm test
    ```
    *(Node.js 22 is required because Cloud Functions decommissioned `nodejs20`.)*
 2. Authenticate Firebase CLI (if `firebase projects:list` reports no active
@@ -191,13 +195,21 @@ clean.
    ```
 4. **Empirical Smoke-Test Gate**:
    ```bash
+   # Unauthenticated probe should return HTTP 401:
+   curl -i -s -X POST "https://<FIREBASE_PROJECT_ID>.web.app/api/verifyIntegrityToken" \
+     -H "Content-Type: application/json" \
+     -d "{\"packageName\":\"<com.example.yourgame>\",\"token\":\"invalid_probe_token\"}"
+
+   # Authenticated probe with a valid Firebase Auth ID token:
    curl -s -X POST "https://<FIREBASE_PROJECT_ID>.web.app/api/verifyIntegrityToken" \
+     -H "Authorization: Bearer <FIREBASE_ID_TOKEN>" \
      -H "Content-Type: application/json" \
      -d "{\"packageName\":\"<com.example.yourgame>\",\"token\":\"invalid_probe_token\"}"
    ```
-   - **Pass**: Returns structured JSON `{"result":false,"error":...}` (proving
-     Hosting rewrite → Cloud Function → `functions/.env` → Play Integrity API
-     worked).
+   - **Pass**: Unauthenticated request returns `HTTP 401`; authenticated request
+     returns structured JSON `{"result":false,"error":...}` (proving Hosting
+     rewrite → Firebase Auth middleware → Cloud Function → `functions/.env` →
+     Play Integrity API worked).
    - **Fail**: HTTP `404`/`500` or HTML error page → inspect
      `firebase functions:log --project "<FIREBASE_PROJECT_ID>"`.
 
@@ -264,7 +276,9 @@ clean.
    & "<PATH_TO_MSBUILD.EXE>" api-client\Teapot-Sdk.sln /t:Build /p:Configuration=Debug /p:Platform=x64 /m /v:minimal
    ```
 3. Verify `api-client\x64\Debug\manifest.xml` and `api-client\x64\Debug\AppConfig.json`
-   reflect the `.local` overrides (without printing `client_secret`).
+   reflect the `.local` overrides (`AppConfig.local.json` contains `client_id`
+   only—never `client_secret`), and set `GOOGLE_OAUTH_CLIENT_SECRET` and
+   `API_AUTH_TOKEN` in the shell environment before launching `GameApplication.exe`.
 4. Launch `api-client\x64\Debug\GameApplication.exe`, open **Billing APIs**, and
    test `0. Google Login` using a **non-developer license-tester Google Account**
    → `1. Get SKUs` → `2. Get Purchases` → `3. Validate Purchase Token` →

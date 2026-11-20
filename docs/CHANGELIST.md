@@ -4,7 +4,22 @@ All notable requirement, architectural, and implementation changes to `native-pc
 
 ---
 
-## [001] - 2026-11-17: Native PC SDK Sample Security Remediation, Cleanup & SDK `26.9.261.0+` Modernization
+## [001] - 2026-11-17: Native PC SDK Sample Cleanup & SDK `26.9.261.0+` Modernization
+
+### Revision 11 (2026-11-20 — Backend Auth Gate, Default-Closed CORS, Loopback Listener & Client Hardening)
+- **`api-server/` (`functions/src/{config,playApiClient,index}.ts`, `functions/test/api.test.js`, `functions/package.json`)**:
+  - Registered fail-closed Firebase Auth middleware (`admin.auth().verifyIdToken`) returning HTTP `401` on every `/api/*` route, removed duplicate `cors(...)` registration, and flipped default `allowedOrigins` from `true` to `false` unless `ALLOWED_ORIGINS` is explicitly set.
+  - Migrated `/verifyPurchaseToken`, `/getPurchases`, and `/getSkuDetails` to `POST` JSON bodies (removing query-string token fallbacks), enforced strict `typeof === 'string'` JSON field checks (HTTP `400` on non-string/array inputs), tightened `SAFE_TOKEN_REGEX` to a positive allowlist, and fixed `resolvePackageName()` to enforce single-package matching unconditionally (HTTP `403` on mismatch).
+  - Added `sanitizeErrorForLog()` across all `functions.logger.error` handlers so HTTP client config/headers are never written to Cloud Logging, added `packageName` verification and token redaction to `rtdnListener`, and added Node unit tests (`npm test`).
+- **`api-client/` (`DevServer.{h,cpp}`, `HelperClasses.{h,cpp}`, `GameHelper.cpp`, `AppSettingsFiles.{h,cpp}`, `GameApplication.{h,rc,vcxproj}`, `resource.h`, `Resource Files/{AppConfig,GameApis}.json`)**:
+  - Replaced `GetRandomUnusedPort()` + `HttpListener` with a per-login `TcpListener(IPAddress::Loopback, 0)` bound directly to an OS-assigned ephemeral port, restricting callbacks strictly to `GET /` with constant-time single-use `state` + PKCE `code_verifier` consumption under a synchronization lock and stopping on completion/timeout/close.
+  - Deleted unrouted legacy methods (`HttpGetCall`, `GetSKUsDetails`, `GetPurchasesDetails`, `PerformCurlPurchasesRequest`, `WriteCallback`, and unused `DevServer` class), removed `index.htm` and duplicate root config files, and stripped `IDR_JSON1`/`IDR_JSON2`/`IDR_HTML1`/`IDR_XML1` RCDATA entries from UTF-16LE `GameApplication.rc` along with dead `FindResource` calls.
+  - Added `TryValidateAllowedHttpsUrl()` pinning `deepLink` to `https://play.google.com` (inside both `GetSkuObj()` and `GetSkusDetails()`) and `authUrl` to `https://accounts.google.com`, removed `client_secret` from `AppConfig.json` / disk JSON loading (reading `GOOGLE_OAUTH_CLIENT_SECRET` strictly from environment), migrated backend calls to `POST` JSON bodies with optional `Authorization: Bearer` header (`API_AUTH_TOKEN`), guarded `AccessToken()` against button re-entrancy, and redacted token prints from stdout.
+- **`sdk-client/` & `sdk-client-unity/` (`GameAppBillingSDKDialog.hpp`, `GameAppGenericClasses.hpp`, `GameStoreManager.cs`)**:
+  - Wired optional `Authorization: Bearer` header support (`API_AUTH_TOKEN` env var or gitignored local config/Inspector field) into `VerifyIntegrityToken` using `RestClient::Connection` (C++) and `UnityWebRequest` (C#).
+  - Added `WM_DESTROY` UI invalidation, one-shot `SetPromiseOnce` guards across all 10 SDK continuations, worker-catch UI error display, and `RedactTokenForLog()` on billing/integrity logs in `sdk-client/`; wrapped Unity `async void` handlers in `try/catch/finally` with post-`await` `this == null` and button null checks plus token log redaction.
+- **Setup Skill & Documentation (`.agents/skills/setup-native-pc-sdk-sample/`, `README.md` guides, `docs/DESIGN.md`)**:
+  - Updated `configure_local.mjs` and `preflight.mjs` so `client_secret` is never written to `AppConfig.local.json`, removed duplicate root writes in `api-client`, and updated `SKILL.md`, `troubleshooting.md`, `README.md` files, and `docs/DESIGN.md`.
 
 ### Revision 10 (2026-11-19 — Bundled Open-Standard Developer Setup Agent Skill)
 - **Developer Onboarding Agent Skill (`.agents/skills/setup-native-pc-sdk-sample/`)**:

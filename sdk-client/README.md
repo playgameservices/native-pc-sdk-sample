@@ -55,6 +55,7 @@ This project demonstrates how to integrate the **[Google Play Games on PC Native
    - **Automatic Build Output Copy**: On build, MSBuild (`CopyLocalManifestOverride`) automatically copies `manifest.local.xml` to `$(OutDir)manifest.xml` next to `GameApplication.exe` (required by `GooglePlayGamesServices.exe` caller-identity verification).
    - **Multi-SKU Support**: Separate multiple active In-App Product IDs with commas in `<SKU>` to populate all of them into the `Query Product Details` SKU dropdown (e.g., one consumable SKU for `Consume Purchase` and one single-quantity SKU for `Acknowledge Purchase`).
    - **Play Integrity Project Alignment**: `<CloudProjectNumber>` **must** match the numeric Google Cloud project number of the Service Account configured in [`api-server`](../api-server) (`SA_EMAIL`), as Play Integrity encrypts tokens specifically for that Cloud project.
+   - **Backend Bearer Authentication (`API_AUTH_TOKEN`)**: Because [`api-server`](../api-server) requires a Firebase Auth ID token on `/api/verifyIntegrityToken`, set the `API_AUTH_TOKEN` environment variable (preferred) or add `<ApiAuthToken>` in gitignored `manifest.local.xml` before running step 11 (`Verify Integrity Token`).
 
 ---
 

@@ -19,113 +19,280 @@ import * as cors from 'cors';
 import * as express from 'express';
 import * as functions from 'firebase-functions/v1';
 
-import { allowedOrigins, packageName, topicID } from './config';
+import { allowedOrigins, topicID } from './config';
 import * as rtdn from './notifications';
 import * as playApiClient from './playApiClient';
 
-admin.initializeApp();
-
-const app = express();
-app.use(cors({ origin: allowedOrigins }));
-app.use(express.json());
-
-/**
- * POST /api/acknowledgePurchase
- * Acknowledges a non-consumable in-app purchase token using the server's Service Account.
- */
-app.post('/acknowledgePurchase', async (req: express.Request, res: express.Response) => {
-  const productId = String(req.body?.productId ?? req.query?.productId ?? '');
-  const token = String(req.body?.token ?? req.query?.token ?? '');
-  const requestedPkg = String(req.body?.packageName ?? req.query?.packageName ?? '');
-  const result = await playApiClient.acknowledgePurchase(productId, token, requestedPkg);
-  res.json(result);
-});
-
-/**
- * POST /api/consumePurchase
- * Consumes a repeatable in-app purchase token using the server's Service Account.
- */
-app.post('/consumePurchase', async (req: express.Request, res: express.Response) => {
-  const productId = String(req.body?.productId ?? req.query?.productId ?? '');
-  const token = String(req.body?.token ?? req.query?.token ?? '');
-  const requestedPkg = String(req.body?.packageName ?? req.query?.packageName ?? '');
-  const result = await playApiClient.consumePurchase(productId, token, requestedPkg);
-  res.json(result);
-});
-
-/**
- * GET|POST /api/verifyPurchaseToken
- * Validates a purchase token and returns the authoritative ProductPurchase state from Google Play.
- */
-async function handleVerifyPurchaseToken(req: express.Request, res: express.Response) {
-  const productId = String(req.query?.productId ?? req.body?.productId ?? '');
-  const token = String(req.query?.token ?? req.body?.token ?? '');
-  const requestedPkg = String(req.query?.packageName ?? req.body?.packageName ?? '');
-  const result = await playApiClient.verifyPurchaseToken(productId, token, requestedPkg);
-  res.json(result);
+if (!admin.apps.length) {
+  admin.initializeApp();
 }
-app.get('/verifyPurchaseToken', handleVerifyPurchaseToken);
-app.post('/verifyPurchaseToken', handleVerifyPurchaseToken);
+
+export interface RequestWithUser extends express.Request {
+  user?: admin.auth.DecodedIdToken;
+}
+
+export type IdTokenVerifier = (token: string) => Promise<admin.auth.DecodedIdToken>;
+
+export interface ApiAppDependencies {
+  corsOrigin?: boolean | string[];
+  verifyIdToken?: IdTokenVerifier;
+  client?: Pick<
+    typeof playApiClient,
+    | 'acknowledgePurchase'
+    | 'consumePurchase'
+    | 'verifyPurchaseToken'
+    | 'verifyIntegrityToken'
+    | 'listPurchases'
+    | 'getSkuDetails'
+  >;
+}
 
 /**
- * POST /api/verifyIntegrityToken
- * Decodes and verifies a PC Play Integrity token (`decodePcIntegrityToken`) and returns
- * the device verdict, licensing verdict, and matched requestHash.
+ * Fail-closed Firebase Auth middleware: requires a valid `Authorization: Bearer <Firebase ID token>`
+ * header on every /api/* endpoint.
  */
-app.post('/verifyIntegrityToken', async (req: express.Request, res: express.Response) => {
-  const token = String(req.body?.token ?? req.query?.token ?? '');
-  const requestedPkg = String(req.body?.packageName ?? req.query?.packageName ?? packageName);
-  const result = await playApiClient.verifyIntegrityToken(token, requestedPkg);
-  res.json(result);
-});
+export function createVerifyAuthMiddleware(
+  verifyIdToken: IdTokenVerifier = (token) => admin.auth().verifyIdToken(token),
+): express.RequestHandler {
+  return async (
+    req: RequestWithUser,
+    res: express.Response,
+    next: express.NextFunction,
+  ): Promise<void> => {
+    const authHeader = req.headers?.authorization;
+    if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        result: false,
+        error: 'Unauthorized: missing or malformed Authorization Bearer token.',
+      });
+      return;
+    }
 
-/**
- * GET /api/getPurchases
- * Legacy REST endpoint used by api-client migration reference.
- */
-app.get('/getPurchases', async (req: express.Request, res: express.Response) => {
-  const userAccessToken = String(req.query?.userAccessToken ?? '');
-  const result = await playApiClient.listPurchases(userAccessToken);
-  res.json({ purchasesresult: result });
-});
+    const bearerToken = authHeader.slice('Bearer '.length).trim();
+    if (!bearerToken || /\s/.test(bearerToken)) {
+      res.status(401).json({
+        result: false,
+        error: 'Unauthorized: missing or malformed Authorization Bearer token.',
+      });
+      return;
+    }
 
-/**
- * GET /api/getSkuDetails
- * Legacy REST endpoint used by api-client migration reference.
- */
-app.get('/getSkuDetails', async (req: express.Request, res: express.Response) => {
-  const userAccessToken = String(req.query?.userAccessToken ?? '');
-  const sku = String(req.query?.sku ?? '');
-  const skutype = String(req.query?.skutype ?? req.query?.skuType ?? 'inapp');
-  const useripaddress = String(req.query?.useripaddress ?? req.query?.userIpAddress ?? '');
-  const languagecode = String(req.query?.languagecode ?? req.query?.languageCode ?? 'en-US');
+    try {
+      req.user = await verifyIdToken(bearerToken);
+      next();
+    } catch (error) {
+      functions.logger.warn(
+        'Rejected unauthenticated API request',
+        playApiClient.sanitizeErrorForLog(error),
+      );
+      res.status(401).json({
+        result: false,
+        error: 'Unauthorized: invalid or expired Firebase ID token.',
+      });
+    }
+  };
+}
 
-  const result = await playApiClient.getSkuDetails(
-    userAccessToken,
-    sku,
-    skutype,
-    useripaddress,
-    languagecode,
-  );
-  res.json({ result });
-});
+function readRequiredString(body: unknown, key: string): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return null;
+  }
+  const value = (body as Record<string, unknown>)[key];
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
-/**
- * POST /api/postSkuDetails
- * Legacy REST helper endpoint preserved for backwards compatibility.
- */
-app.post('/postSkuDetails', async (req: express.Request, res: express.Response) => {
-  const userAccessToken = String(req.body?.userAccessToken ?? '');
-  const sku = String(req.body?.sku ?? '');
-  const result = await playApiClient.getSkuDetails(userAccessToken, sku, 'inapp', '', 'en-US');
-  res.json({ result });
-});
+function readOptionalString(
+  body: unknown,
+  keys: string[],
+  defaultValue = '',
+): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return defaultValue;
+  }
+  const record = body as Record<string, unknown>;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) {
+      const value = record[key];
+      if (value === undefined || value === null) {
+        continue;
+      }
+      if (typeof value !== 'string') {
+        return null;
+      }
+      return value.trim();
+    }
+  }
+  return defaultValue;
+}
 
-const mainApp = express();
-mainApp.use(cors({ origin: allowedOrigins }));
-mainApp.use('/api', app);
+export function createApiApp(deps: ApiAppDependencies = {}): express.Express {
+  const corsOrigin = deps.corsOrigin !== undefined ? deps.corsOrigin : allowedOrigins;
+  const verifyIdToken =
+    deps.verifyIdToken ?? ((token: string) => admin.auth().verifyIdToken(token));
+  const client = deps.client ?? playApiClient;
 
-export const main = functions.https.onRequest(mainApp);
+  const apiRouter = express.Router();
+  apiRouter.use(cors({ origin: corsOrigin }));
+  apiRouter.use(express.json({ limit: '64kb' }));
+  apiRouter.use(createVerifyAuthMiddleware(verifyIdToken));
+
+  /**
+   * POST /api/acknowledgePurchase
+   * Acknowledges a non-consumable in-app purchase token using the server's Service Account.
+   */
+  apiRouter.post('/acknowledgePurchase', async (req: RequestWithUser, res: express.Response) => {
+    const productId = readRequiredString(req.body, 'productId');
+    const token = readRequiredString(req.body, 'token');
+    const requestedPkg = readOptionalString(req.body, ['packageName']);
+    if (!productId || !token || requestedPkg === null) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string fields productId and token.',
+      });
+      return;
+    }
+    const outcome = await client.acknowledgePurchase(productId, token, requestedPkg);
+    res.status(outcome.status).json(outcome.body);
+  });
+
+  /**
+   * POST /api/consumePurchase
+   * Consumes a repeatable in-app purchase token using the server's Service Account.
+   */
+  apiRouter.post('/consumePurchase', async (req: RequestWithUser, res: express.Response) => {
+    const productId = readRequiredString(req.body, 'productId');
+    const token = readRequiredString(req.body, 'token');
+    const requestedPkg = readOptionalString(req.body, ['packageName']);
+    if (!productId || !token || requestedPkg === null) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string fields productId and token.',
+      });
+      return;
+    }
+    const outcome = await client.consumePurchase(productId, token, requestedPkg);
+    res.status(outcome.status).json(outcome.body);
+  });
+
+  /**
+   * POST /api/verifyPurchaseToken
+   * Validates a purchase token and returns the authoritative ProductPurchase state from Google Play.
+   */
+  apiRouter.post('/verifyPurchaseToken', async (req: RequestWithUser, res: express.Response) => {
+    const productId = readRequiredString(req.body, 'productId');
+    const token = readRequiredString(req.body, 'token');
+    const requestedPkg = readOptionalString(req.body, ['packageName']);
+    if (!productId || !token || requestedPkg === null) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string fields productId and token.',
+      });
+      return;
+    }
+    const outcome = await client.verifyPurchaseToken(productId, token, requestedPkg);
+    res.status(outcome.status).json(outcome.body);
+  });
+
+  /**
+   * POST /api/verifyIntegrityToken
+   * Decodes and verifies a PC Play Integrity token (`decodePcIntegrityToken`) and returns
+   * the device verdict, licensing verdict, and matched requestHash.
+   */
+  apiRouter.post('/verifyIntegrityToken', async (req: RequestWithUser, res: express.Response) => {
+    const token = readRequiredString(req.body, 'token');
+    const requestedPkg = readOptionalString(req.body, ['packageName']);
+    if (!token || requestedPkg === null) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string field token.',
+      });
+      return;
+    }
+    const outcome = await client.verifyIntegrityToken(token, requestedPkg);
+    res.status(outcome.status).json(outcome.body);
+  });
+
+  /**
+   * POST /api/getPurchases
+   * Legacy REST endpoint used by api-client migration reference (POST JSON body to avoid tokens in URLs).
+   */
+  apiRouter.post('/getPurchases', async (req: RequestWithUser, res: express.Response) => {
+    const userAccessToken = readRequiredString(req.body, 'userAccessToken');
+    if (!userAccessToken) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string field userAccessToken.',
+      });
+      return;
+    }
+    const outcome = await client.listPurchases(userAccessToken);
+    res.status(outcome.status).json(outcome.body);
+  });
+
+  /**
+   * POST /api/getSkuDetails
+   * Legacy REST endpoint used by api-client migration reference (POST JSON body to avoid tokens in URLs).
+   */
+  apiRouter.post('/getSkuDetails', async (req: RequestWithUser, res: express.Response) => {
+    const userAccessToken = readRequiredString(req.body, 'userAccessToken');
+    const sku = readRequiredString(req.body, 'sku');
+    const skuType = readOptionalString(req.body, ['skuType', 'skutype'], 'inapp');
+    const userIpAddress = readOptionalString(req.body, ['userIpAddress', 'useripaddress'], '');
+    const languageCode = readOptionalString(req.body, ['languageCode', 'languagecode'], 'en-US');
+
+    if (
+      !userAccessToken ||
+      !sku ||
+      skuType === null ||
+      userIpAddress === null ||
+      languageCode === null
+    ) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include valid string fields userAccessToken and sku.',
+      });
+      return;
+    }
+
+    const outcome = await client.getSkuDetails(
+      userAccessToken,
+      sku,
+      skuType,
+      userIpAddress,
+      languageCode,
+    );
+    res.status(outcome.status).json(outcome.body);
+  });
+
+  /**
+   * POST /api/postSkuDetails
+   * Legacy REST helper endpoint preserved for backwards compatibility.
+   */
+  apiRouter.post('/postSkuDetails', async (req: RequestWithUser, res: express.Response) => {
+    const userAccessToken = readRequiredString(req.body, 'userAccessToken');
+    const sku = readRequiredString(req.body, 'sku');
+    if (!userAccessToken || !sku) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string fields userAccessToken and sku.',
+      });
+      return;
+    }
+    const outcome = await client.getSkuDetails(userAccessToken, sku, 'inapp', '', 'en-US');
+    res.status(outcome.status).json(outcome.body);
+  });
+
+  const mainApp = express();
+  mainApp.disable('x-powered-by');
+  mainApp.use('/api', apiRouter);
+  return mainApp;
+}
+
+export const main = functions.https.onRequest(createApiApp());
 
 /**
  * Pub/Sub Real-Time Developer Notification (RTDN) listener.
@@ -133,9 +300,23 @@ export const main = functions.https.onRequest(mainApp);
 export const rtdnListener = functions.pubsub.topic(topicID).onPublish(async (message) => {
   try {
     const notification = message.json as rtdn.DeveloperNotification;
-    const subInfo = notification?.subscriptionNotification;
+    const configuredPkg = playApiClient.getConfiguredPackageName();
+    if (!notification?.packageName || notification.packageName !== configuredPkg) {
+      functions.logger.warn('Ignoring RTDN event for unexpected packageName', {
+        receivedPackageName: notification?.packageName ?? '',
+        expectedPackageName: configuredPkg,
+      });
+      return;
+    }
+
+    const subInfo = notification.subscriptionNotification;
     if (!subInfo?.subscriptionId || !subInfo?.purchaseToken) {
-      functions.logger.info('Received non-subscription or test RTDN event', notification);
+      functions.logger.info('Received non-subscription or test RTDN event', {
+        version: notification.version,
+        packageName: notification.packageName,
+        eventTimeMillis: notification.eventTimeMillis,
+        hasTestNotification: Boolean(notification.testNotification),
+      });
       return;
     }
 
@@ -149,6 +330,9 @@ export const rtdnListener = functions.pubsub.topic(topicID).onPublish(async (mes
       entitlementActive: subPurchase?.isEntitlementActive() ?? false,
     });
   } catch (error) {
-    functions.logger.error('Error processing RTDN Pub/Sub message', error);
+    functions.logger.error(
+      'Error processing RTDN Pub/Sub message',
+      playApiClient.sanitizeErrorForLog(error),
+    );
   }
 });

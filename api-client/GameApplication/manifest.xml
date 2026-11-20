@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<Manifest version="1">
-  <Application>
-    <PackageName>com.example.yourgame</PackageName>
-    <SKU>your-iap-product-id</SKU>
-    <BackendBaseUrl>https://your-project.web.app</BackendBaseUrl>
-  </Application>
-</Manifest>

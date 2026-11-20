@@ -7,23 +7,25 @@ This Firebase Cloud Functions (**Node.js 22**) project provides the reference ba
 
 ---
 
-## Exposed Endpoints (`/api/*`)
+## Authentication & Exposed Endpoints (`/api/*`)
+
+All `/api/*` endpoints require a valid **Firebase Auth ID token** in the `Authorization: Bearer <ID_TOKEN>` header (requests without a valid token are rejected with HTTP `401`) and accept **JSON `POST` bodies only** so purchase, integrity, and OAuth tokens are never placed in URL query strings or access logs. CORS is **disabled by default** (`allowedOrigins = false`) and only enabled for origins explicitly listed in `ALLOWED_ORIGINS`.
 
 | Endpoint | Method | Used By | Purpose |
 | :--- | :--- | :--- | :--- |
 | `/api/verifyIntegrityToken` | `POST` | `sdk-client`, `sdk-client-unity`, `api-client` | Calls `playintegrity.googleapis.com/v1/{packageName}:decodePcIntegrityToken` to verify `MEETS_PC_INTEGRITY`, `appLicensingVerdict`, and the SHA-256 `requestHash`. |
-| `/api/verifyPurchaseToken` | `GET` / `POST` | Backend verification / `api-client` | Calls `androidpublisher.purchases.products.get` to verify purchase state (`PURCHASED` vs `PENDING`) and order metadata on the server. |
+| `/api/verifyPurchaseToken` | `POST` | Backend verification / `api-client` | Calls `androidpublisher.purchases.products.get` to verify purchase state (`PURCHASED` vs `PENDING`) and order metadata on the server. |
 | `/api/acknowledgePurchase` | `POST` | Server-authoritative games / `api-client` | Calls `androidpublisher.purchases.products.acknowledge`. |
 | `/api/consumePurchase` | `POST` | Server-authoritative games / `api-client` | Calls `androidpublisher.purchases.products.consume`. |
-| `/api/getPurchases` | `GET` | `api-client` *(Legacy Migration Reference)* | Lists user purchases via `userAccessToken` *(requires EAP-enrolled Cloud project on `androidpublisher.googleapis.com`)*. |
-| `/api/getSkuDetails` | `GET` | `api-client` *(Legacy Migration Reference)* | Queries SKU metadata & web checkout link via `userAccessToken` *(requires EAP-enrolled Cloud project on `androidpublisher.googleapis.com`)*. |
+| `/api/getPurchases` | `POST` | `api-client` *(Legacy Migration Reference)* | Lists user purchases via JSON body `userAccessToken` *(requires EAP-enrolled Cloud project on `androidpublisher.googleapis.com`)*. |
+| `/api/getSkuDetails` | `POST` | `api-client` *(Legacy Migration Reference)* | Queries SKU metadata & web checkout link via JSON body `userAccessToken` *(requires EAP-enrolled Cloud project on `androidpublisher.googleapis.com`)*. |
 
 ---
 
 ## Setup & Deployment
 
-1. **Configure Google Cloud & Play Console**:
-   - Create or select a Firebase / Google Cloud project in the [Firebase Console](https://console.firebase.google.com/).
+1. **Configure Google Cloud, Firebase Auth & Play Console**:
+   - Create or select a Firebase / Google Cloud project in the [Firebase Console](https://console.firebase.google.com/) and enable **Firebase Authentication** (so clients can obtain Firebase Auth ID tokens for the `Authorization: Bearer` header).
    - Enable the **Google Play Android Developer API** (`androidpublisher.googleapis.com`) and **Google Play Integrity API** (`playintegrity.googleapis.com`) on the Google Cloud project that owns your runtime Service Account.
    - Invite your Service Account (`...@...gserviceaccount.com`) in **Google Play Console → Users and permissions** with **View app information**, **View financial data**, and **Manage orders and subscriptions** permissions for your game package.
    - **Important (`<CloudProjectNumber>` Alignment)**: Ensure `<CloudProjectNumber>` in `sdk-client` / `sdk-client-unity` is set to the numeric Google Cloud project number of `SA_EMAIL` so `decodePcIntegrityToken` can decrypt integrity tokens minted by the client.
@@ -40,14 +42,15 @@ This Firebase Cloud Functions (**Node.js 22**) project provides the reference ba
    ```
    - `SA_EMAIL`: Google Cloud Service Account email granted Play Console permissions.
    - `SA_KEY`: Service Account private key PEM (with `\n` newlines).
-   - `PLAY_PACKAGE_NAME`: Enforces single-package isolation so callers cannot query arbitrary package names with your Service Account.
-   - `ALLOWED_ORIGINS` *(optional)*: Comma-separated list of allowed CORS origins.
+   - `PLAY_PACKAGE_NAME`: Server-enforced single package name (requests targeting any other package name are rejected with HTTP `403`).
+   - `ALLOWED_ORIGINS` *(optional)*: Comma-separated list of allowed CORS browser origins (disabled by default when unset).
 
-4. **Install, Build, and Deploy**:
+4. **Install, Lint, Test, Build, and Deploy**:
    ```bash
    cd api-server/functions
    npm install
    npm run lint
+   npm test
    npm run build
    cd ..
    firebase deploy --only functions,hosting --force

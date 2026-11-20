@@ -19,42 +19,100 @@ import { google } from 'googleapis';
 import * as billing from './billing';
 import * as myconfig from './config';
 
-// Strict input validation patterns to prevent URL path traversal and SSRF.
+// Strict input validation patterns to prevent URL path traversal and injection.
 const PACKAGE_NAME_REGEX = /^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$/;
 const PRODUCT_ID_REGEX = /^[a-zA-Z0-9._-]{1,150}$/;
-// Tokens must be non-empty and must not contain URL path/query delimiter or traversal sequences.
-const SAFE_TOKEN_REGEX = /^[^\s/?#&\\]{8,4096}$/;
+// Positive character allowlist for Play purchase tokens, Play Integrity tokens,
+// and Google OAuth access tokens (excludes '/', '?', '#', '&', '\\', ',', '%', ';', whitespace, and control chars).
+const SAFE_TOKEN_REGEX = /^[A-Za-z0-9._~:+=-]{8,4096}$/;
+
+export interface ApiCallResult<T = Record<string, any>> {
+  status: number;
+  body: T;
+}
+
+export class PackageAuthorizationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PackageAuthorizationError';
+  }
+}
+
+export class InvalidPackageNameError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidPackageNameError';
+  }
+}
 
 export function isValidPackageName(pkg: string): boolean {
-  return PACKAGE_NAME_REGEX.test(pkg) && !pkg.includes('..');
+  return typeof pkg === 'string' && PACKAGE_NAME_REGEX.test(pkg) && !pkg.includes('..');
 }
 
 export function isValidProductId(productId: string): boolean {
-  return PRODUCT_ID_REGEX.test(productId) && !productId.includes('..');
+  return typeof productId === 'string' && PRODUCT_ID_REGEX.test(productId) && !productId.includes('..');
 }
 
 export function isValidToken(token: string): boolean {
-  return SAFE_TOKEN_REGEX.test(token) && !token.includes('..');
+  return typeof token === 'string' && SAFE_TOKEN_REGEX.test(token) && !token.includes('..');
 }
 
 /**
- * Resolves and validates the target package name. To prevent arbitrary cross-package
- * queries using the server's service account, if PLAY_PACKAGE_NAME is configured
- * (and not the sample placeholder), the requested package must match it.
+ * Strips HTTP request/response config objects (including Authorization Bearer headers)
+ * from Gaxios / googleapis errors before writing to Cloud Logging.
+ */
+export function sanitizeErrorForLog(error: unknown): Record<string, unknown> {
+  if (error instanceof Error) {
+    const errObj = error as Error & {
+      code?: unknown;
+      status?: unknown;
+      response?: { status?: unknown; statusText?: unknown };
+    };
+    const sanitized: Record<string, unknown> = {
+      name: errObj.name,
+      message: errObj.message,
+    };
+    if (errObj.code !== undefined) {
+      sanitized.code = errObj.code;
+    }
+    const httpStatus = errObj.status ?? errObj.response?.status;
+    if (httpStatus !== undefined) {
+      sanitized.status = httpStatus;
+    }
+    if (errObj.response?.statusText !== undefined) {
+      sanitized.statusText = errObj.response.statusText;
+    }
+    return sanitized;
+  }
+  return { message: String(error) };
+}
+
+/**
+ * Returns the server-configured Play Console package name.
+ */
+export function getConfiguredPackageName(): string {
+  return (process.env.PLAY_PACKAGE_NAME ?? myconfig.packageName).trim();
+}
+
+/**
+ * Resolves and validates the target package name. Always enforces single-package
+ * isolation against the server-configured package name (whether supplied via
+ * PLAY_PACKAGE_NAME or config.ts) so callers cannot query other apps with the
+ * backend Service Account.
  */
 export function resolvePackageName(requestedPackage?: string): string {
-  const defaultPkg = process.env.PLAY_PACKAGE_NAME ?? myconfig.packageName;
-  const candidate = (requestedPackage || defaultPkg).trim();
+  const configuredPkg = getConfiguredPackageName();
+  if (!isValidPackageName(configuredPkg)) {
+    throw new InvalidPackageNameError('Server packageName is not configured with a valid format.');
+  }
+  const candidate = (requestedPackage ? requestedPackage.trim() : '') || configuredPkg;
   if (!isValidPackageName(candidate)) {
-    throw new Error('Invalid packageName format.');
+    throw new InvalidPackageNameError('Invalid packageName format.');
   }
-  if (
-    process.env.PLAY_PACKAGE_NAME &&
-    candidate !== process.env.PLAY_PACKAGE_NAME.trim()
-  ) {
-    throw new Error(`Unauthorized packageName '${candidate}'.`);
+  if (candidate !== configuredPkg) {
+    throw new PackageAuthorizationError(`Unauthorized packageName '${candidate}'.`);
   }
-  return candidate;
+  return configuredPkg;
 }
 
 let cachedJwtClient: InstanceType<typeof google.auth.JWT> | null = null;
@@ -77,13 +135,28 @@ function getPlayClients() {
       auth: cachedJwtClient,
     });
   }
-  const activePkg = (
-    process.env.PLAY_PACKAGE_NAME ?? myconfig.packageName
-  ).trim();
+  const activePkg = getConfiguredPackageName();
   return {
     jwtClient: cachedJwtClient,
     playApi: cachedPlayApi,
     activePkg,
+  };
+}
+
+function mapErrorToResult(context: string, error: unknown): ApiCallResult {
+  if (error instanceof InvalidPackageNameError) {
+    return { status: 400, body: { result: false, error: error.message } };
+  }
+  if (error instanceof PackageAuthorizationError) {
+    return { status: 403, body: { result: false, error: error.message } };
+  }
+  functions.logger.error(context, sanitizeErrorForLog(error));
+  return {
+    status: 502,
+    body: {
+      result: false,
+      error: error instanceof Error ? error.message : String(error),
+    },
   };
 }
 
@@ -94,9 +167,12 @@ export async function acknowledgePurchase(
   productId: string,
   token: string,
   requestedPackageName?: string,
-): Promise<any> {
+): Promise<ApiCallResult> {
   if (!isValidProductId(productId) || !isValidToken(token)) {
-    return { result: false, error: 'Invalid productId or purchase token format.' };
+    return {
+      status: 400,
+      body: { result: false, error: 'Invalid productId or purchase token format.' },
+    };
   }
   try {
     const targetPkg = resolvePackageName(requestedPackageName);
@@ -106,10 +182,9 @@ export async function acknowledgePurchase(
       productId,
       token,
     });
-    return res.data ?? { result: true };
+    return { status: 200, body: res.data ?? { result: true } };
   } catch (error) {
-    functions.logger.error('Error calling acknowledgePurchase', error);
-    return { result: false, error: error instanceof Error ? error.message : String(error) };
+    return mapErrorToResult('Error calling acknowledgePurchase', error);
   }
 }
 
@@ -120,9 +195,12 @@ export async function consumePurchase(
   productId: string,
   token: string,
   requestedPackageName?: string,
-): Promise<any> {
+): Promise<ApiCallResult> {
   if (!isValidProductId(productId) || !isValidToken(token)) {
-    return { result: false, error: 'Invalid productId or purchase token format.' };
+    return {
+      status: 400,
+      body: { result: false, error: 'Invalid productId or purchase token format.' },
+    };
   }
   try {
     const targetPkg = resolvePackageName(requestedPackageName);
@@ -132,10 +210,9 @@ export async function consumePurchase(
       productId,
       token,
     });
-    return res.data ?? { result: true };
+    return { status: 200, body: res.data ?? { result: true } };
   } catch (error) {
-    functions.logger.error('Error calling consumePurchase', error);
-    return { result: false, error: error instanceof Error ? error.message : String(error) };
+    return mapErrorToResult('Error calling consumePurchase', error);
   }
 }
 
@@ -146,9 +223,12 @@ export async function verifyPurchaseToken(
   productId: string,
   token: string,
   requestedPackageName?: string,
-): Promise<any> {
+): Promise<ApiCallResult> {
   if (!isValidProductId(productId) || !isValidToken(token)) {
-    return { result: false, error: 'Invalid productId or purchase token format.' };
+    return {
+      status: 400,
+      body: { result: false, error: 'Invalid productId or purchase token format.' },
+    };
   }
   try {
     const targetPkg = resolvePackageName(requestedPackageName);
@@ -158,10 +238,9 @@ export async function verifyPurchaseToken(
       productId,
       token,
     });
-    return res.data;
+    return { status: 200, body: res.data };
   } catch (error) {
-    functions.logger.error('Error calling verifyPurchaseToken', error);
-    return { result: false, error: error instanceof Error ? error.message : String(error) };
+    return mapErrorToResult('Error calling verifyPurchaseToken', error);
   }
 }
 
@@ -184,7 +263,7 @@ export async function fetchSubscriptionPurchase(
     });
     return billing.SubscriptionPurchase.fromApiResponse(res.data, purchaseToken);
   } catch (error) {
-    functions.logger.error('Error fetching subscription purchase info', error);
+    functions.logger.error('Error fetching subscription purchase info', sanitizeErrorForLog(error));
     return null;
   }
 }
@@ -195,16 +274,19 @@ export async function fetchSubscriptionPurchase(
 export async function verifyIntegrityToken(
   token: string,
   requestedPackageName?: string,
-): Promise<any> {
+): Promise<ApiCallResult> {
   if (!isValidToken(token)) {
-    return { result: false, error: 'Invalid integrity token format.' };
+    return {
+      status: 400,
+      body: { result: false, error: 'Invalid integrity token format.' },
+    };
   }
 
   let targetPackage: string;
   try {
     targetPackage = resolvePackageName(requestedPackageName);
   } catch (err) {
-    return { result: false, error: err instanceof Error ? err.message : 'Invalid packageName.' };
+    return mapErrorToResult('Invalid packageName in verifyIntegrityToken', err);
   }
 
   try {
@@ -224,40 +306,55 @@ export async function verifyIntegrityToken(
     const tokenPayload = payload?.tokenPayloadExternal;
 
     if (!tokenPayload || !tokenPayload.requestDetails) {
-      return { result: false, error: 'Invalid response from Play Integrity API', payload };
+      return {
+        status: 502,
+        body: { result: false, error: 'Invalid response from Play Integrity API', payload },
+      };
     }
 
     if (tokenPayload.requestDetails.requestPackageName !== targetPackage) {
-      return { result: false, error: 'Package name mismatch', payload };
+      return {
+        status: 403,
+        body: { result: false, error: 'Package name mismatch', payload },
+      };
     }
 
     const verdicts: string[] | undefined = tokenPayload.deviceIntegrity?.deviceRecognitionVerdict;
     if (Array.isArray(verdicts) && verdicts.includes('MEETS_PC_INTEGRITY')) {
       return {
-        result: true,
-        hash: tokenPayload.requestDetails.requestHash || '',
-        payload,
+        status: 200,
+        body: {
+          result: true,
+          hash: tokenPayload.requestDetails.requestHash || '',
+          payload,
+        },
       };
     }
 
-    return { result: false, error: 'Device does not meet PC integrity', payload };
+    return {
+      status: 200,
+      body: { result: false, error: 'Device does not meet PC integrity', payload },
+    };
   } catch (error) {
-    functions.logger.error('Error calling verifyIntegrityToken', error);
-    return { result: false, error: error instanceof Error ? error.message : String(error) };
+    return mapErrorToResult('Error calling verifyIntegrityToken', error);
   }
 }
 
 /**
  * Legacy REST helper (used by api-client migration reference): lists user purchases.
  */
-export async function listPurchases(userAccessToken: string): Promise<any> {
+export async function listPurchases(userAccessToken: string): Promise<ApiCallResult> {
   if (!isValidToken(userAccessToken)) {
-    return { result: false, error: 'Invalid userAccessToken format.' };
+    return {
+      status: 400,
+      body: { result: false, error: 'Invalid userAccessToken format.' },
+    };
   }
   try {
-    const { jwtClient, activePkg } = getPlayClients();
+    const targetPkg = resolvePackageName();
+    const { jwtClient } = getPlayClients();
     const endpoint = new URL(
-      `https://www.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(activePkg)}/purchases/products`,
+      `https://www.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(targetPkg)}/purchases/products`,
     );
     endpoint.searchParams.set('userAccessToken', userAccessToken);
 
@@ -265,10 +362,9 @@ export async function listPurchases(userAccessToken: string): Promise<any> {
       url: endpoint.toString(),
       method: 'GET',
     });
-    return result.data;
+    return { status: 200, body: { purchasesresult: result.data } };
   } catch (error) {
-    functions.logger.error('Error calling listPurchases', error);
-    return { result: false, error: error instanceof Error ? error.message : String(error) };
+    return mapErrorToResult('Error calling listPurchases', error);
   }
 }
 
@@ -281,9 +377,12 @@ export async function getSkuDetails(
   skuType: string,
   userIp: string,
   languageCode: string,
-): Promise<any> {
+): Promise<ApiCallResult> {
   if (!isValidToken(userAccessToken) || !isValidProductId(sku)) {
-    return { result: false, error: 'Invalid userAccessToken or sku format.' };
+    return {
+      status: 400,
+      body: { result: false, error: 'Invalid userAccessToken or sku format.' },
+    };
   }
   const normalizedType = skuType === 'subs' ? 'subs' : 'inapp';
   const normalizedLang = /^[a-zA-Z]{2,3}(-[a-zA-Z0-9]{2,8})?$/.test(languageCode)
@@ -292,9 +391,10 @@ export async function getSkuDetails(
   const normalizedIp = /^[0-9a-fA-F.:]{3,45}$/.test(userIp) ? userIp : '';
 
   try {
-    const { jwtClient, activePkg } = getPlayClients();
+    const targetPkg = resolvePackageName();
+    const { jwtClient } = getPlayClients();
     const endpoint = new URL(
-      `https://www.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(activePkg)}/skus`,
+      `https://www.googleapis.com/androidpublisher/v3/applications/${encodeURIComponent(targetPkg)}/skus`,
     );
     endpoint.searchParams.set('sku', sku);
     endpoint.searchParams.set('skuType', normalizedType);
@@ -308,9 +408,8 @@ export async function getSkuDetails(
       url: endpoint.toString(),
       method: 'GET',
     });
-    return result.data;
+    return { status: 200, body: { result: result.data } };
   } catch (error) {
-    functions.logger.error('Error calling getSkuDetails', error);
-    return { result: false, error: error instanceof Error ? error.message : String(error) };
+    return mapErrorToResult('Error calling getSkuDetails', error);
   }
 }
