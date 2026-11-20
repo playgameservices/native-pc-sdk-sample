@@ -13,7 +13,6 @@
 #define IDB_GLOGIN                      125
 #define IDR_JSON1                       50001
 #define IDR_JSON2                       50002
-#define IDR_JSON3                       50003
 #define ID_FILE                         40002
 #define ID_OPTION                       40003
 #define ID_HELP                         40004

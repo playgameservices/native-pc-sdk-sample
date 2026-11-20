@@ -8,17 +8,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "GameApplication", "GameAppl
 		{D141F6CA-6348-420F-8FFE-25351285308B} = {D141F6CA-6348-420F-8FFE-25351285308B}
 	EndProjectSection
 EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Android", "Android", "{A423DD29-6838-46DF-B28C-606E602A63E3}"
-	ProjectSection(SolutionItems) = preProject
-		build.gradle = build.gradle
-		GameApplication\build.gradle = GameApplication\build.gradle
-		gradle.properties = gradle.properties
-		settings.gradle = settings.gradle
-	EndProjectSection
-EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{86E09C9D-5E71-4780-8398-0CD94544502D}"
 	ProjectSection(SolutionItems) = preProject
-		gradlew.bat = gradlew.bat
 		README.md = README.md
 	EndProjectSection
 EndProject

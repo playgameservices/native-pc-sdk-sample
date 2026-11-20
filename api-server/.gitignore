@@ -1,7 +1,9 @@
-node_modules/*
-public/*
-.firebase/*
-functions/lib/*
+node_modules/
+.firebase/
+functions/lib/
 /build
 .DS_Store
 *debug.log
+.env
+.env.*
+.secret.local

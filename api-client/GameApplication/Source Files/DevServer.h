@@ -16,7 +16,7 @@ namespace GameApplication {
     using namespace System;
     using namespace System::Net;
 
-    ref class HttpListenerThread {
+    public ref class HttpListenerThread {
     public:
         HttpListener^ mListenerOnThread;
 		HttpListenerContext^ mContext;

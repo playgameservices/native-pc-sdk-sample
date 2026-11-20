@@ -94,7 +94,7 @@ namespace GameApplication {
 			PurchasesResult^ purchasesresult;
 	};
 
-	ref class AppSettingsFiles
+	public ref class AppSettingsFiles
 	{
 	public:
 		String^ mPackageName;
@@ -105,10 +105,13 @@ namespace GameApplication {
 		List<GameApis^>^ mGameApiList;
 		String^ mState;
 		String^ mUserAccessToken;
+		String^ codeVerifier;
 		String^ codeChallenge;
 		String^ mRedirectUri;
+		String^ mBackendBaseUrl;
 	public:
 		AppSettingsFiles();
+		void RegenerateOAuthSecurityParams();
 
 	protected:
 		void ParseManifestXml();

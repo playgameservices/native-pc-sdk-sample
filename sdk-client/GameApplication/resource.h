@@ -2,11 +2,10 @@
 // Microsoft Visual C++ generated include file.
 // Used by GameApplication.rc
 //
-#define NUM_LIST_ITEMS                  10
+#define NUM_LIST_ITEMS                  11
+#define WM_APP_SDK_RESULT               (WM_APP + 1)
 #define IDI_ICON1                       101
 #define IDD_SDK                         107
-//#define IDOK                            1004
-//#define IDCANCEL                        1005
 #define IDC_ListOperation               1006
 #define IDC_BUTTON1                     1008
 #define IDC_Run                         1008
@@ -24,12 +23,12 @@
 #define IDC_ParamStatus                 1018
 
 // Next default values for new objects
-// 
+//
 #ifdef APSTUDIO_INVOKED
 #ifndef APSTUDIO_READONLY_SYMBOLS
 #define _APS_NEXT_RESOURCE_VALUE        110
 #define _APS_NEXT_COMMAND_VALUE         40001
-#define _APS_NEXT_CONTROL_VALUE         1014
+#define _APS_NEXT_CONTROL_VALUE         1019
 #define _APS_NEXT_SYMED_VALUE           101
 #endif
 #endif

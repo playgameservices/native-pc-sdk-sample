@@ -370,5 +370,6 @@ namespace GameApplication {
 		void GetAcknowledgePurchase();
 		void PostValidatePurchase();
 		void PostConsumePurchase();
+		void PostVerifyIntegrityToken();
 };
 }

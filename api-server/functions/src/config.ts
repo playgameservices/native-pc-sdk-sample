@@ -14,24 +14,26 @@
  *  limitations under the License.
  */
 
-/**
- * This file is so a user can set their desired constants for their account.
- */
+// SECURITY: Never commit real service-account keys to source control.
+// Configure SA_EMAIL, SA_KEY, and PLAY_PACKAGE_NAME via Firebase Functions
+// environment variables / secrets (`firebase functions:secrets:set SA_KEY`).
+export const serviceAccountEmail = process.env.SA_EMAIL ?? '<SERVICE_ACCOUNT_EMAIL>';
+export const serviceAccountPrivateKey = (
+  process.env.SA_KEY ?? '<SERVICE_ACCOUNT_PRIVATE_KEY>'
+).replace(/\\n/g, '\n');
 
-// SECURITY: never commit service-account keys. Load from the Functions
-// runtime environment (set via `firebase functions:secrets:set SA_KEY`).
-export const serviceAccountEmail =
-  process.env.SA_EMAIL ?? '<SERVICE_ACCOUNT_EMAIL>';
-export const serviceAccountPrivateKey =
-  (process.env.SA_KEY ?? '<SERVICE_ACCOUNT_PRIVATE_KEY>').replace(/\\n/g, '\n');
+// Canonical Play Console package name allowed by this backend.
+export const packageName = process.env.PLAY_PACKAGE_NAME ?? 'com.example.yourgame';
 
-// app package name
-export const packageName = 'com.dynasty.pconlygame';
+// Optional comma-separated CORS origins (defaults to true for desktop/Unity sample clients).
+export const allowedOrigins: boolean | string[] = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map((origin) => origin.trim())
+  : true;
 
-// RTDN pub/sub topic ID
-export const topicID = 'teapot-billing';
+// Real-Time Developer Notifications (RTDN) Cloud Pub/Sub topic ID.
+export const topicID = process.env.RTDN_TOPIC_ID ?? 'your-rtdn-pubsub-topic';
 
-// needed scopes
+// Required Google API OAuth2 scopes for purchase and Play Integrity verification.
 export const scopes: string[] = [
   'https://www.googleapis.com/auth/androidpublisher',
   'https://www.googleapis.com/auth/playintegrity',

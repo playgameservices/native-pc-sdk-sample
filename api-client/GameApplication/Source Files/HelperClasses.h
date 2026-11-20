@@ -53,7 +53,7 @@ namespace GameApplication {
 	};
 
 	[DataContract]
-	ref class GameApis {
+	public ref class GameApis {
 	public:
 		[DataMember]
 		int ID;
@@ -74,7 +74,7 @@ namespace GameApplication {
 	List<GameApis^>^ ReadApis(String^ fileName);
 
 	[DataContract]
-	ref class Config {
+	public ref class Config {
 	public:
 		[DataMember]
 		String^ client_id;
@@ -94,7 +94,7 @@ namespace GameApplication {
 	Config^ ReadConfig(String^ fileName);
 
 	[DataContract]
-	ref class Response {
+	public ref class Response {
 	public:
 		[DataMember]
 			String^ access_token;
@@ -111,7 +111,7 @@ namespace GameApplication {
 	};
 	Response^ ReadResponse(String^ jsonString);
 
-	ref class SharedData {
+	public ref class SharedData {
 	public:
 		Config^ sdConfig;
 		Response^ sdResposne;
@@ -119,6 +119,7 @@ namespace GameApplication {
 		String^ sdLocalhostAddress;
 		String^ sdApiResponse;
 		String^ mState;
+		String^ codeVerifier;
 		String^ sdServiceAccessToken;
 	};
 
@@ -154,6 +155,17 @@ namespace GameApplication {
 			String^ token;
 		RequestData();
 		RequestData(String^ ssku, String^ stoken);
+	};
+
+	[DataContract]
+	public ref class IntegrityRequestData
+	{
+	public:
+		[DataMember]
+			String^ packageName;
+		[DataMember]
+			String^ token;
+		IntegrityRequestData(String^ pkg, String^ tok) : packageName(pkg), token(tok) {}
 	};
 
 	//template<typename T>
