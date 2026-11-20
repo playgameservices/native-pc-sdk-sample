@@ -1,22 +1,12 @@
 {
-  "name": "setup-cpp-vcpkg",
-  "version-string": "unversioned",
-  "description": "Setting up C++ for Google Cloud with CMake and vcpkg",
+  "name": "native-pc-sdk-sample-cpp",
+  "version-string": "2.0.0",
+  "description": "Google Play Games on PC Native C++ SDK Sample dependencies",
   "dependencies": [
     "glew",
     "freeglut",
     "nlohmann-json",
-    {
-      "name": "google-cloud-cpp",
-      "default-features": false,
-      "features": [
-        "storage"
-      ]
-    },
     "tinyxml2",
-    "boost-asio",
-    "boost-beast",
-    "boost-json",
     "restclient-cpp"
   ]
 }

@@ -41,31 +41,21 @@ namespace GameApplication {
 
     bool CGLControl::IsRunningInCloud()
     {
-        bool ret = false;
-        String^ output = nullptr;
-
         try {
-            Process^ process = gcnew Process();
-            process->StartInfo->FileName = "cmd.exe";  // Running cmd.exe
-            process->StartInfo->Arguments = "/C wmic computersystem get Manufacturer /value";
-            process->StartInfo->RedirectStandardOutput = true;
-            process->StartInfo->RedirectStandardError = true;
-            process->StartInfo->UseShellExecute = false;
-            process->StartInfo->CreateNoWindow = true;
-
-            if (!process->Start()) {
-                Console::WriteLine("Failed to start process.");
-                return ret;
+            Microsoft::Win32::RegistryKey^ biosKey =
+                Microsoft::Win32::Registry::LocalMachine->OpenSubKey("HARDWARE\\DESCRIPTION\\System\\BIOS");
+            if (biosKey != nullptr) {
+                Object^ mfgObj = biosKey->GetValue("SystemManufacturer");
+                biosKey->Close();
+                if (mfgObj != nullptr) {
+                    return mfgObj->ToString()->Contains("Google");
+                }
             }
-            output = process->StandardOutput->ReadToEnd();
-            process->WaitForExit();
         }
         catch (Exception^ ex) {
-            Console::WriteLine("An error occurred: {0}", ex->Message);
-            return ret;
+            Console::WriteLine("Registry BIOS check skipped: {0}", ex->Message);
         }
-        ret = output->Contains("Google");
-        return ret;
+        return false;
     }
 
     // Init_OpenGL() function
@@ -214,7 +204,6 @@ namespace GameApplication {
                 glutInit(&argc, argv);
                 free(argv[0]);
                 free(argv[1]);
-                free(argv[2]);
                 return true;
             }
             puts("");

@@ -1,975 +1,1545 @@
-#ifndef __GAMEAPPBILLINGSDKDIALOG_HPP__
-#define __GAMEAPPBILLINGSDKDIALOG_HPP__
+#ifndef GAME_APP_BILLING_SDK_DIALOG_HPP_
+#define GAME_APP_BILLING_SDK_DIALOG_HPP_
+
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
 #include <windows.h>
-#include "resource.h"
-#include "GameAppGenericClasses.hpp"
-#include "billing\client.h"
-#include <initialization/models.h>
-#include <initialization/initialization.h>
-#include <integrity/enums.h>
-#include <integrity/client.h>
-#include <integrity/models.h>
+
+#include <algorithm>
+#include <atomic>
+#include <format>
+#include <functional>
+#include <future>
+#include <map>
+#include <memory>
+#include <mutex>
+#include <optional>
+#include <sstream>
+#include <string>
+#include <thread>
+#include <utility>
+#include <vector>
+
 #include <billing/client.h>
 #include <billing/enums.h>
-#include <format>
 #include <billing/models.h>
-#include <future>
-#include <memory>
+#include <initialization/enums.h>
+#include <initialization/initialization.h>
+#include <initialization/models.h>
+#include <integrity/client.h>
+#include <integrity/enums.h>
+#include <integrity/models.h>
+#include <restclient-cpp/connection.h>
 #include <restclient-cpp/restclient.h>
-using namespace google::play::initialization;
-using namespace google::play::billing;
-using namespace google::play::integrity;
+
+#include "GameAppGenericClasses.hpp"
+#include "resource.h"
 
 namespace GameApp {
-    // Define the list items as an array of strings
-    static const wstring ListBoxItems[NUM_LIST_ITEMS] = {
-        L"Inititialize Billing SDK",
-        L"Query Product Details",
-        L"IsBillingProgramAvailable",
-        L"CreateBillingProgramReportingDetails",
-        L"Launch Purchase Flow",
-        L"Acknowledge Purchase",
-        L"Consume Purchase",
-        L"Prepare Integrity Token",
-        L"Request Integrity Token",
-        L"Verify Integrity Token",
-    };
 
-    static const wstring IsBillingOptions[2] = {
-        L"1 - kBillingProgramAlternativeBillingOnly",
-        L"2 - kBillingProgramUserChoice"
-    };
+using ::google::play::billing::AcknowledgePurchaseParams;
+using ::google::play::billing::AcknowledgePurchaseResult;
+using ::google::play::billing::AcknowledgePurchaseResultValue;
+using ::google::play::billing::BillingClient;
+using ::google::play::billing::BillingClientParams;
+using ::google::play::billing::BillingError;
+using ::google::play::billing::BillingProgram;
+using ::google::play::billing::ConsumePurchaseParams;
+using ::google::play::billing::ConsumePurchaseResult;
+using ::google::play::billing::ConsumePurchaseResultValue;
+using ::google::play::billing::CreateBillingProgramReportingDetailsParams;
+using ::google::play::billing::CreateBillingProgramReportingDetailsResult;
+using ::google::play::billing::IsBillingProgramAvailableParams;
+using ::google::play::billing::IsBillingProgramAvailableResult;
+using ::google::play::billing::LaunchPurchaseFlowParams;
+using ::google::play::billing::LaunchPurchaseFlowResult;
+using ::google::play::billing::LaunchPurchaseFlowResultValue;
+using ::google::play::billing::ProductId;
+using ::google::play::billing::ProductOffer;
+using ::google::play::billing::ProductPurchaseDetails;
+using ::google::play::billing::ProductType;
+using ::google::play::billing::PurchaseState;
+using ::google::play::billing::QueryProductDetailsParams;
+using ::google::play::billing::QueryProductDetailsResult;
+using ::google::play::billing::QueryProductDetailsResultValue;
+using ::google::play::billing::QueryPurchasesResult;
+using ::google::play::initialization::Environment;
+using ::google::play::initialization::FormFactor;
+using ::google::play::initialization::GooglePlayInitialize;
+using ::google::play::initialization::GooglePlayInitializeParams;
+using ::google::play::initialization::InitializationError;
+using ::google::play::initialization::InitializeResult;
+using ::google::play::integrity::IntegrityClient;
+using ::google::play::integrity::PrepareIntegrityTokenParams;
+using ::google::play::integrity::PrepareIntegrityTokenResult;
+using ::google::play::integrity::PrepareIntegrityTokenResultValue;
+using ::google::play::integrity::RequestIntegrityTokenParams;
+using ::google::play::integrity::RequestIntegrityTokenResult;
+using ::google::play::integrity::RequestIntegrityTokenResultValue;
 
-    class GameAppBillingSdkDialog {
-    public:
-        GameAppBillingSdkDialog(HINSTANCE hInstance) : m_hWnd(nullptr), m_hInstance(hInstance) {
-            appEvents[BillingOps::kSdkInit].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedInitializeSdk, this, std::placeholders::_1);
-            appEvents[BillingOps::kSdkInit].onClick = bind(&GameAppBillingSdkDialog::OnClickInitializeSdk, this, std::placeholders::_1);
-            appEvents[BillingOps::kBillingClientInit].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedQueryProductDetails, this, std::placeholders::_1);
-            appEvents[BillingOps::kBillingClientInit].onClick = bind(&GameAppBillingSdkDialog::OnClickQueryProductDetails, this, std::placeholders::_1);
-            appEvents[BillingOps::kIsBillingProgramAvailable].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedIsBillingProgramAvailable, this, std::placeholders::_1);
-            appEvents[BillingOps::kIsBillingProgramAvailable].onClick = bind(&GameAppBillingSdkDialog::OnClickIsBillingProgramAvailable, this, std::placeholders::_1);
-            appEvents[BillingOps::kCreateBillingProgramReportingDetails].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedCreateBillingProgramReportingDetails, this, std::placeholders::_1);
-            appEvents[BillingOps::kCreateBillingProgramReportingDetails].onClick = bind(&GameAppBillingSdkDialog::OnClickCreateBillingProgramReportingDetails, this, std::placeholders::_1);
-            appEvents[BillingOps::kLaunchPurchaseFlow].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedLaunchPurchaseFlow, this, std::placeholders::_1);
-            appEvents[BillingOps::kLaunchPurchaseFlow].onClick = bind(&GameAppBillingSdkDialog::OnClickLaunchPurchaseFlow, this, std::placeholders::_1);
-            appEvents[BillingOps::kAcknowledgePurchase].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedAcknowledgePurchase, this, std::placeholders::_1);
-            appEvents[BillingOps::kAcknowledgePurchase].onClick = bind(&GameAppBillingSdkDialog::OnClickAcknowledgePurchase, this, std::placeholders::_1);
-            appEvents[BillingOps::kConsumePurchase].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedConsumePurchase, this, std::placeholders::_1);
-            appEvents[BillingOps::kConsumePurchase].onClick = bind(&GameAppBillingSdkDialog::OnClickConsumePurchase, this, std::placeholders::_1);
-            appEvents[BillingOps::kPrepareIntegrityToken].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedPrepareIntegrityToken, this, std::placeholders::_1);
-            appEvents[BillingOps::kPrepareIntegrityToken].onClick = bind(&GameAppBillingSdkDialog::OnClickPrepareIntegrityToken, this, std::placeholders::_1);
-            appEvents[BillingOps::kRequestIntegrityToken].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedRequestIntegrityToken, this, std::placeholders::_1);
-            appEvents[BillingOps::kRequestIntegrityToken].onClick = bind(&GameAppBillingSdkDialog::OnClickRequestIntegrityToken, this, std::placeholders::_1);
-            appEvents[BillingOps::kVerifyIntegrityToken].onSelect = bind(&GameAppBillingSdkDialog::OnSelectedVerifyIntegrityToken, this, std::placeholders::_1);
-            appEvents[BillingOps::kVerifyIntegrityToken].onClick = bind(&GameAppBillingSdkDialog::OnClickVerifyIntegrityToken, this, std::placeholders::_1);
+// Unified operation sequence shared with sdk-client-unity:
+// 1..8: Core Billing SDK + Purchase Restoration
+// 9..11: Play Integrity API
+static const std::wstring kListBoxItems[NUM_LIST_ITEMS] = {
+    L"Initialize Billing SDK",
+    L"Query Product Details",
+    L"IsBillingProgramAvailable",
+    L"CreateBillingProgramReportingDetails",
+    L"Launch Purchase Flow",
+    L"Query Purchases",
+    L"Acknowledge Purchase",
+    L"Consume Purchase",
+    L"Prepare Integrity Token",
+    L"Request Integrity Token",
+    L"Verify Integrity Token",
+};
+
+class GameAppBillingSdkDialog {
+ public:
+  explicit GameAppBillingSdkDialog(HINSTANCE hInstance)
+      : m_hWnd(nullptr),
+        m_hInstance(hInstance),
+        mUiState(std::make_shared<AsyncUiState>()) {
+    appEvents[BillingOps::kSdkInit] = {
+        [this]() { OnSelectedInitializeSdk(); },
+        [this]() { OnClickInitializeSdk(); }};
+    appEvents[BillingOps::kQueryProductDetails] = {
+        [this]() { OnSelectedQueryProductDetails(); },
+        [this]() { OnClickQueryProductDetails(); }};
+    appEvents[BillingOps::kIsBillingProgramAvailable] = {
+        [this]() { OnSelectedIsBillingProgramAvailable(); },
+        [this]() { OnClickIsBillingProgramAvailable(); }};
+    appEvents[BillingOps::kCreateBillingProgramReportingDetails] = {
+        [this]() { OnSelectedCreateBillingProgramReportingDetails(); },
+        [this]() { OnClickCreateBillingProgramReportingDetails(); }};
+    appEvents[BillingOps::kLaunchPurchaseFlow] = {
+        [this]() { OnSelectedLaunchPurchaseFlow(); },
+        [this]() { OnClickLaunchPurchaseFlow(); }};
+    appEvents[BillingOps::kQueryPurchases] = {
+        [this]() { OnSelectedQueryPurchases(); },
+        [this]() { OnClickQueryPurchases(); }};
+    appEvents[BillingOps::kAcknowledgePurchase] = {
+        [this]() { OnSelectedAcknowledgePurchase(); },
+        [this]() { OnClickAcknowledgePurchase(); }};
+    appEvents[BillingOps::kConsumePurchase] = {
+        [this]() { OnSelectedConsumePurchase(); },
+        [this]() { OnClickConsumePurchase(); }};
+    appEvents[BillingOps::kPrepareIntegrityToken] = {
+        [this]() { OnSelectedPrepareIntegrityToken(); },
+        [this]() { OnClickPrepareIntegrityToken(); }};
+    appEvents[BillingOps::kRequestIntegrityToken] = {
+        [this]() { OnSelectedRequestIntegrityToken(); },
+        [this]() { OnClickRequestIntegrityToken(); }};
+    appEvents[BillingOps::kVerifyIntegrityToken] = {
+        [this]() { OnSelectedVerifyIntegrityToken(); },
+        [this]() { OnClickVerifyIntegrityToken(); }};
+  }
+
+  ~GameAppBillingSdkDialog() { InvalidateUiState(); }
+
+  GameAppBillingSdkDialog(const GameAppBillingSdkDialog&) = delete;
+  GameAppBillingSdkDialog& operator=(const GameAppBillingSdkDialog&) = delete;
+
+  void ShowDialog() {
+    DialogBoxParam(m_hInstance, MAKEINTRESOURCE(IDD_SDK), nullptr, DialogProc,
+                   reinterpret_cast<LPARAM>(this));
+  }
+
+ private:
+  struct AsyncUiState {
+    std::mutex mtx;
+    HWND hWnd = nullptr;
+    bool dialogAlive = false;
+    std::function<void()> pendingCallback;
+  };
+
+  struct EventPair {
+    std::function<void()> onSelect;
+    std::function<void()> onClick;
+  };
+
+  enum BillingOps {
+    kSdkInit = 0,
+    kQueryProductDetails,
+    kIsBillingProgramAvailable,
+    kCreateBillingProgramReportingDetails,
+    kLaunchPurchaseFlow,
+    kQueryPurchases,
+    kAcknowledgePurchase,
+    kConsumePurchase,
+    kPrepareIntegrityToken,
+    kRequestIntegrityToken,
+    kVerifyIntegrityToken,
+    Count
+  };
+  static_assert(BillingOps::Count == NUM_LIST_ITEMS,
+                "BillingOps::Count must match NUM_LIST_ITEMS");
+
+  HWND m_hWnd = nullptr;
+  HINSTANCE m_hInstance = nullptr;
+  int m_nSelectedOperation = -1;
+  bool m_bOperationInFlight = false;
+
+  HWND hComboBox1 = nullptr;
+  HWND hComboBox2 = nullptr;
+  HWND hComboBox3 = nullptr;
+  HWND hParamLabel1 = nullptr;
+  HWND hParamLabel2 = nullptr;
+  HWND hParamLabel3 = nullptr;
+  HWND hParamStatus = nullptr;
+  HWND hResult = nullptr;
+  HWND hRunButton = nullptr;
+
+  std::shared_ptr<AsyncUiState> mUiState;
+
+  // SDK clients managed via shared_ptr so background worker threads keep the
+  // native handle alive even if the user closes the modal dialog mid-operation.
+  std::shared_ptr<BillingClient> mBillingClient;
+  std::shared_ptr<IntegrityClient> mIntegrityClient;
+
+  // Cached Billing state
+  QueryProductDetailsResultValue mQueryProdResValue;
+  std::vector<std::string> mAvailableOfferTokens;
+  std::vector<ProductPurchaseDetails> mKnownPurchases;
+  std::string mLastExternalTransactionToken;
+
+  // Cached Play Integrity state
+  std::optional<PrepareIntegrityTokenResultValue> mPrepareIntegrityTokenResValue;
+  std::optional<RequestIntegrityTokenResultValue> mRequestIntegrityTokenResValue;
+  std::string mCachedRequestHash;
+  bool mSdkInitialized = false;
+
+  Manifest manifest;
+  EventPair appEvents[BillingOps::Count];
+
+  const std::map<BillingError, std::string> sdkErrorMsg = {
+      {BillingError::kOk, "The operation completed successfully."},
+      {BillingError::kUserCanceled, "Transaction was canceled by the user."},
+      {BillingError::kServiceUnavailable,
+       "The service is currently unavailable."},
+      {BillingError::kBillingUnavailable,
+       "A user billing error occurred during processing."},
+      {BillingError::kItemUnavailable,
+       "The requested product is not available for purchase."},
+      {BillingError::kDeveloperError,
+       "Error resulting from incorrect usage of the API."},
+      {BillingError::kError, "Fatal error during the API action."},
+      {BillingError::kItemAlreadyOwned,
+       "The purchase failed because the item is already owned."},
+      {BillingError::kItemNotOwned,
+       "Requested action failed because the item is not owned by the user."},
+      {BillingError::kNetworkError,
+       "A network error occurred during the operation."},
+      {BillingError::kServiceDisconnected,
+       "The app is not connected to the Google Play Billing Library."},
+  };
+
+  void InvalidateUiState() {
+    if (!mUiState) return;
+    std::lock_guard<std::mutex> lock(mUiState->mtx);
+    mUiState->dialogAlive = false;
+    mUiState->hWnd = nullptr;
+    mUiState->pendingCallback = nullptr;
+  }
+
+  // Ensures an async SDK continuation settles its std::promise at most once,
+  // preventing std::future_error if a callback were ever invoked more than once.
+  template <typename T>
+  static void SetPromiseOnce(
+      const std::shared_ptr<std::promise<T>>& promise,
+      const std::shared_ptr<std::atomic_bool>& settled,
+      T&& value) {
+    bool expected = false;
+    if (settled && settled->compare_exchange_strong(expected, true)) {
+      promise->set_value(std::move(value));
+    }
+  }
+
+  std::string GetBillingErrorDescription(BillingError err) const {
+    auto it = sdkErrorMsg.find(err);
+    if (it != sdkErrorMsg.end()) {
+      return it->second;
+    }
+    return "Unrecognized billing error code.";
+  }
+
+  static std::string EnvironmentToString(Environment env) {
+    switch (env) {
+      case Environment::kWindows:
+        return "Windows";
+      case Environment::kAndroid:
+        return "Android";
+      case Environment::kUnknown:
+      default:
+        return "Unknown";
+    }
+  }
+
+  static std::string FormFactorToString(FormFactor ff) {
+    switch (ff) {
+      case FormFactor::kDesktop:
+        return "Desktop";
+      case FormFactor::kMobile:
+        return "Mobile";
+      case FormFactor::kUnknown:
+      default:
+        return "Unknown";
+    }
+  }
+
+  static std::string PurchaseStateToString(PurchaseState state) {
+    switch (state) {
+      case PurchaseState::kPurchaseStatePurchased:
+        return "PURCHASED (1)";
+      case PurchaseState::kPurchaseStatePending:
+        return "PENDING (2)";
+      case PurchaseState::kPurchaseStateUnspecified:
+      default:
+        return "UNSPECIFIED (0)";
+    }
+  }
+
+  static std::string BillingProgramToString(BillingProgram prog) {
+    switch (prog) {
+      case BillingProgram::kBillingProgramAlternativeBillingOnly:
+        return "1 - kBillingProgramAlternativeBillingOnly";
+      case BillingProgram::kBillingProgramUserChoice:
+        return "2 - kBillingProgramUserChoice";
+      default:
+        return "Unknown BillingProgram";
+    }
+  }
+
+  void UpsertKnownPurchase(const ProductPurchaseDetails& detail) {
+    if (detail.purchase_token.empty()) return;
+    for (auto& existing : mKnownPurchases) {
+      if (existing.purchase_token == detail.purchase_token) {
+        existing = detail;
+        return;
+      }
+    }
+    mKnownPurchases.push_back(detail);
+  }
+
+  void RemoveKnownPurchase(const std::string& token) {
+    mKnownPurchases.erase(
+        std::remove_if(mKnownPurchases.begin(), mKnownPurchases.end(),
+                       [&token](const ProductPurchaseDetails& p) {
+                         return p.purchase_token == token;
+                       }),
+        mKnownPurchases.end());
+  }
+
+  void SetResultText(const std::string& utf8Message) {
+    if (hResult != nullptr) {
+      SetWindowTextW(hResult, stringToWstring(utf8Message).c_str());
+    }
+  }
+
+  // Dispatches blocking SDK / HTTP work onto a background thread and posts the
+  // UI completion callback back onto the Win32 dialog message loop so the
+  // window never freezes (e.g. during the 5-minute LaunchPurchaseFlow window).
+  void RunAsyncOperation(std::function<std::function<void()>()> backgroundWork) {
+    if (m_bOperationInFlight) {
+      SetResultText("An operation is already in progress. Please wait...");
+      return;
+    }
+    m_bOperationInFlight = true;
+    if (hRunButton != nullptr) {
+      EnableWindow(hRunButton, FALSE);
+    }
+
+    auto uiState = mUiState;
+    std::thread([this, uiState, work = std::move(backgroundWork)]() {
+      std::function<void()> uiCompletion;
+      try {
+        uiCompletion = work();
+      } catch (const std::exception& ex) {
+        std::string errMsg =
+            std::string("Unhandled exception in async worker: ") + ex.what();
+        GameLogging::Error(errMsg);
+        uiCompletion = [this, errMsg]() { SetResultText(errMsg); };
+      }
+
+      std::lock_guard<std::mutex> lock(uiState->mtx);
+      if (uiState->dialogAlive && uiState->hWnd != nullptr) {
+        uiState->pendingCallback = std::move(uiCompletion);
+        PostMessageW(uiState->hWnd, WM_APP_SDK_RESULT, 0, 0);
+      }
+    }).detach();
+  }
+
+  void OnAsyncResultMessage() {
+    std::function<void()> callback;
+    {
+      std::lock_guard<std::mutex> lock(mUiState->mtx);
+      callback = std::move(mUiState->pendingCallback);
+      mUiState->pendingCallback = nullptr;
+    }
+    m_bOperationInFlight = false;
+    if (hRunButton != nullptr) {
+      EnableWindow(hRunButton, TRUE);
+    }
+    if (callback) {
+      callback();
+    }
+  }
+
+  static INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam,
+                                     LPARAM lParam) {
+    GameAppBillingSdkDialog* pThis = reinterpret_cast<GameAppBillingSdkDialog*>(
+        GetWindowLongPtr(hwndDlg, GWLP_USERDATA));
+    switch (uMsg) {
+      case WM_INITDIALOG: {
+        pThis = reinterpret_cast<GameAppBillingSdkDialog*>(lParam);
+        SetWindowLongPtr(hwndDlg, GWLP_USERDATA,
+                         reinterpret_cast<LONG_PTR>(pThis));
+        if (pThis != nullptr) {
+          HWND hListBox = GetDlgItem(hwndDlg, IDC_ListOperation);
+          HFONT hFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+          SendMessageW(hListBox, WM_SETFONT, reinterpret_cast<WPARAM>(hFont),
+                       TRUE);
+          for (int i = 0; i < NUM_LIST_ITEMS; ++i) {
+            SendMessageW(hListBox, LB_ADDSTRING, 0,
+                         reinterpret_cast<LPARAM>(kListBoxItems[i].c_str()));
+          }
+          pThis->OnInitDialog(hwndDlg);
         }
+        return TRUE;
+      }
 
-        ~GameAppBillingSdkDialog() {
-            if (mBillingClient) {
-                delete mBillingClient;
-                mBillingClient = nullptr;
-            }
-            if (mIntegrityClient) {
-                delete mIntegrityClient;
-                mIntegrityClient = nullptr;
-            }
-            if (mPrepareIntegrityTokenResValue) {
-                delete mPrepareIntegrityTokenResValue;
-                mPrepareIntegrityTokenResValue = nullptr;
-            }
-            if (mRequestIntegrityTokenResValue) {
-                delete mRequestIntegrityTokenResValue;
-                mRequestIntegrityTokenResValue = nullptr;
-            }
+      case WM_APP_SDK_RESULT: {
+        if (pThis != nullptr) {
+          pThis->OnAsyncResultMessage();
         }
+        return TRUE;
+      }
 
-        // This function shows the dialog box
-        void ShowDialog() {
-            DialogBoxParam(m_hInstance, MAKEINTRESOURCE(IDD_SDK), nullptr, DialogProc, reinterpret_cast<LPARAM>(this));
+      case WM_COMMAND: {
+        WORD notificationCode = HIWORD(wParam);
+        if (pThis != nullptr) {
+          if (LOWORD(wParam) == IDC_Run) {
+            pThis->OnRunButtonClicked();
+            return TRUE;
+          } else if (LOWORD(wParam) == IDC_ListOperation &&
+                     notificationCode == LBN_SELCHANGE) {
+            pThis->OnListItemSelected(hwndDlg);
+            return TRUE;
+          } else if (LOWORD(wParam) == IDCANCEL || LOWORD(wParam) == 2) {
+            pThis->InvalidateUiState();
+            EndDialog(hwndDlg, 0);
+            return TRUE;
+          }
         }
+        break;
+      }
 
-    private:
-        HWND m_hWnd;            // Handle to the dialog
-        HINSTANCE m_hInstance;  // Application instance handle
-        int m_nSelectedOperation = -1;
-        HWND hComboBox1 = nullptr;
-        HWND hComboBox2 = nullptr;
-        HWND hComboBox3 = nullptr;
-        HWND hParamLabel1 = nullptr;
-        HWND hParamLabel2 = nullptr;
-        HWND hParamLabel3 = nullptr;
-        HWND hParamStatus = nullptr;
-        HWND hResult = nullptr;
-        bool m_bCanMoveToStage = false;
+      case WM_CLOSE: {
+        if (pThis != nullptr) {
+          pThis->InvalidateUiState();
+        }
+        EndDialog(hwndDlg, 0);
+        return TRUE;
+      }
 
+      case WM_DESTROY: {
+        if (pThis != nullptr) {
+          pThis->InvalidateUiState();
+        }
+        return TRUE;
+      }
 
-        // Billing SDK
-        BillingClient* mBillingClient = nullptr;
-        ProductId mProductid;
-        QueryProductDetailsResultValue mQueryPrudResValue;
-        LaunchPurchaseFlowResultValue mLaunchPurchaseFlowResValue;
-        AcknowledgePurchaseResultValue mAcknowledgePurchaseResultValue;
-        ConsumePurchaseResultValue mConsumePurchaseResultValue;
-        IsBillingProgramAvailableResultValue mIsBillingProgramAvailableResultValue;
+      default:
+        break;
+    }
+    return FALSE;
+  }
 
-        // Play Integrity API
-        IntegrityClient* mIntegrityClient = nullptr;
-        PrepareIntegrityTokenResultValue* mPrepareIntegrityTokenResValue = nullptr;
-        RequestIntegrityTokenResultValue* mRequestIntegrityTokenResValue = nullptr;
-        std::string mCachedRequestHash;
+  void HideLabelsComboBox(int numPar) {
+    ShowWindow(hParamLabel1, SW_HIDE);
+    ShowWindow(hParamLabel2, SW_HIDE);
+    ShowWindow(hParamLabel3, SW_HIDE);
+    ShowWindow(hComboBox1, SW_HIDE);
+    ShowWindow(hComboBox2, SW_HIDE);
+    ShowWindow(hComboBox3, SW_HIDE);
+    ShowWindow(hParamStatus, SW_HIDE);
 
-        // Application Settings
-        Manifest manifest;
+    SendMessageW(hComboBox1, CB_RESETCONTENT, 0, 0);
+    SendMessageW(hComboBox2, CB_RESETCONTENT, 0, 0);
+    SendMessageW(hComboBox3, CB_RESETCONTENT, 0, 0);
 
-        // Events Architecture
-        using FPEvents = std::function<void(void*)>;
+    if (numPar <= 0) {
+      ShowWindow(hParamStatus, SW_SHOW);
+      return;
+    }
+    if (numPar >= 1) {
+      ShowWindow(hParamLabel1, SW_SHOW);
+      ShowWindow(hComboBox1, SW_SHOW);
+    }
+    if (numPar >= 2) {
+      ShowWindow(hParamLabel2, SW_SHOW);
+      ShowWindow(hComboBox2, SW_SHOW);
+    }
+    if (numPar >= 3) {
+      ShowWindow(hParamLabel3, SW_SHOW);
+      ShowWindow(hComboBox3, SW_SHOW);
+    }
+  }
 
-        template <typename FP>
-        struct EPair : public std::pair<FP, FP> {
-            using std::pair<FP, FP>::pair;
-            FP onSelect;
-            FP onClick;
-            EPair(FP e1, FP e2) : onSelect(e1), onClick(e2) {}
-        };
+  void OnInitDialog(HWND hwndDlg) {
+    m_hWnd = hwndDlg;
+    {
+      std::lock_guard<std::mutex> lock(mUiState->mtx);
+      mUiState->hWnd = hwndDlg;
+      mUiState->dialogAlive = true;
+    }
 
-        enum BillingOps {
-            kSdkInit,
-            kBillingClientInit,
-            kIsBillingProgramAvailable,
-            kCreateBillingProgramReportingDetails,
-            kLaunchPurchaseFlow,
-            kAcknowledgePurchase,
-            kConsumePurchase,
-            kPrepareIntegrityToken,
-            kRequestIntegrityToken,
-            kVerifyIntegrityToken,
-            Count
-        };
-        EPair<FPEvents>appEvents[BillingOps::Count];
+    ParseXmlFile("manifest.xml", manifest);
+    hComboBox1 = GetDlgItem(hwndDlg, IDC_Param1);
+    hComboBox2 = GetDlgItem(hwndDlg, IDC_Param2);
+    hComboBox3 = GetDlgItem(hwndDlg, IDC_Param3);
+    hParamLabel1 = GetDlgItem(hwndDlg, IDC_Parameter1);
+    hParamLabel2 = GetDlgItem(hwndDlg, IDC_Parameter2);
+    hParamLabel3 = GetDlgItem(hwndDlg, IDC_Parameter3);
+    hParamStatus = GetDlgItem(hwndDlg, IDC_ParamStatus);
+    hResult = GetDlgItem(hwndDlg, IDC_Result);
+    hRunButton = GetDlgItem(hwndDlg, IDC_Run);
 
-        map<BillingError, string> sdkErrorMsg = {
-            {BillingError::kOk,"The operation completed successfully"},//kOk = 0
-            {BillingError::kBillingUnavailable,"A user billing error occurred during processing."},//kBillingUnavailable = 3
-            {BillingError::kDeveloperError,"Error resulting from incorrect usage of the API."},//kDeveloperError = 5
-            {BillingError::kError,"Fatal error during the API action."},//kError = 6
-            {BillingError::kItemAlreadyOwned,"The purchase failed because the item is already owned."},//kItemAlreadyOwned = 7,
-            {BillingError::kItemNotOwned,"Requested action on the item failed since it is not owned by the user."},//kItemNotOwned = 8,
-            {BillingError::kItemUnavailable,"The requested product is not available for purchase."}, //kItemUnavailable = 4,
-            {BillingError::kNetworkError,"A network error occurred during the operation."},//kNetworkError = 12
-            {BillingError::kServiceDisconnected,"The app is not connected to the Google Play Billing Library."},//kServiceDisconnected = -1,
-            {BillingError::kServiceUnavailable,"The service is currently unavailable."}, //kServiceUnavailable = 2,
-            {BillingError::kUserCanceled,"Transaction was canceled by the user."}
-        };
-        // Static message handler for dialog events
-        static INT_PTR CALLBACK DialogProc(HWND hwndDlg, UINT uMsg, WPARAM wParam, LPARAM lParam) {
-            GameAppBillingSdkDialog* pThis = reinterpret_cast<GameAppBillingSdkDialog*>(GetWindowLongPtr(hwndDlg, GWLP_USERDATA));
-            switch (uMsg) {
-            case WM_INITDIALOG: {
-                pThis = reinterpret_cast<GameAppBillingSdkDialog*>(lParam);
-                SetWindowLongPtr(hwndDlg, GWLP_USERDATA, (LONG_PTR)pThis);
-                if (pThis) {
-                    HWND hListBox = GetDlgItem(hwndDlg, IDC_ListOperation);
-                    HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-                    SendMessage(hListBox, WM_SETFONT, (WPARAM)hFont, TRUE);
-                    for (int i = 0; i < NUM_LIST_ITEMS; i++) {
-                        SendMessage(hListBox, LB_ADDSTRING, 0, (LPARAM)ListBoxItems[i].c_str());
-                    }
-                    pThis->OnInitDialog(hwndDlg);
-                }
-            }
-                              return TRUE;
+    HFONT hFont = static_cast<HFONT>(GetStockObject(DEFAULT_GUI_FONT));
+    SendMessageW(hComboBox1, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
+    SendMessageW(hComboBox2, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
+    SendMessageW(hComboBox3, WM_SETFONT, reinterpret_cast<WPARAM>(hFont), TRUE);
 
-            case WM_COMMAND: {
-                WORD notificationCode = HIWORD(wParam);
-                if (pThis) {
-                    if (LOWORD(wParam) == IDC_Run) {
-                        pThis->OnRunButtonClicked();
-                        return TRUE;
-                    }
-                    else if (LOWORD(wParam) == IDC_ListOperation && notificationCode == LBN_SELCHANGE) {
-                        pThis->OnListItemSelected(hwndDlg);
-                        return TRUE;
-                    }
-                    else if (LOWORD(wParam) == 2)
-                    {
-                        EndDialog(hwndDlg, 0);
-                        return TRUE;
-                    }
-                }
-            }
-                           break;
-            case WM_CLOSE:
-                EndDialog(hwndDlg, 0);
-                return TRUE;
+    HideLabelsComboBox(0);
+  }
+
+  void OnListItemSelected(HWND hwndDlg) {
+    if (m_bOperationInFlight) {
+      return;
+    }
+    HWND hListBox = GetDlgItem(hwndDlg, IDC_ListOperation);
+    SetResultText("");
+    m_nSelectedOperation =
+        static_cast<int>(SendMessageW(hListBox, LB_GETCURSEL, 0, 0));
+    if (m_nSelectedOperation != LB_ERR &&
+        m_nSelectedOperation >= 0 &&
+        m_nSelectedOperation < BillingOps::Count) {
+      wchar_t text[256] = {0};
+      SendMessageW(hListBox, LB_GETTEXT,
+                   static_cast<WPARAM>(m_nSelectedOperation),
+                   reinterpret_cast<LPARAM>(text));
+      SetWindowTextW(GetDlgItem(hwndDlg, IDC_Function), text);
+      appEvents[m_nSelectedOperation].onSelect();
+    }
+  }
+
+  void GetComboBoxText(HWND combo, int& index, std::string& ret) {
+    index = static_cast<int>(SendMessageW(combo, CB_GETCURSEL, 0, 0));
+    ret.clear();
+    if (index != CB_ERR) {
+      LRESULT len = SendMessageW(combo, CB_GETLBTEXTLEN, index, 0);
+      if (len == CB_ERR || len < 0) return;
+      std::wstring wstr(static_cast<size_t>(len) + 1, L'\0');
+      SendMessageW(combo, CB_GETLBTEXT, index,
+                   reinterpret_cast<LPARAM>(wstr.data()));
+      wstr.resize(static_cast<size_t>(len));
+      ret = wstringTostring(wstr);
+    }
+  }
+
+  void OnRunButtonClicked() {
+    try {
+      if (m_nSelectedOperation < 0 ||
+          m_nSelectedOperation >= BillingOps::Count) {
+        std::string mess = "Warning: Select an operation first.";
+        GameLogging::Warning(mess);
+        SetResultText(mess);
+        return;
+      }
+      appEvents[m_nSelectedOperation].onClick();
+    } catch (const std::exception& e) {
+      std::string errMsg =
+          "Exception in " +
+          wstringTostring(kListBoxItems[m_nSelectedOperation]) + ": " +
+          e.what();
+      GameLogging::Error(errMsg);
+      SetResultText(errMsg);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Selection Handlers (Populate UI Parameters)
+  // ---------------------------------------------------------------------------
+
+  void OnSelectedInitializeSdk() {
+    GameLogging::Info("Selected Initialize Billing SDK");
+    HideLabelsComboBox(1);
+    SetWindowTextW(hParamLabel1, L"package_name:");
+    std::string pkg = manifest.App.PackageName.empty()
+                          ? "(from manifest.xml)"
+                          : manifest.App.PackageName;
+    SendMessageW(hComboBox1, CB_ADDSTRING, 0,
+                 reinterpret_cast<LPARAM>(stringToWstring(pkg).c_str()));
+    SendMessageW(hComboBox1, CB_SETCURSEL, 0, 0);
+  }
+
+  void OnSelectedQueryProductDetails() {
+    if (!mBillingClient) {
+      SetResultText("Error: Initialize the Billing SDK first.");
+      HideLabelsComboBox(0);
+      return;
+    }
+    GameLogging::Info("Selected Query Product Details");
+    HideLabelsComboBox(2);
+
+    SetWindowTextW(hParamLabel1, L"Product ID:");
+    if (!manifest.App.skuList.empty()) {
+      for (const auto& skuItem : manifest.App.skuList) {
+        std::wstring proId = stringToWstring(skuItem);
+        SendMessageW(hComboBox1, CB_ADDSTRING, 0,
+                     reinterpret_cast<LPARAM>(proId.c_str()));
+      }
+    } else {
+      std::wstring proId = stringToWstring(manifest.App.sku);
+      SendMessageW(hComboBox1, CB_ADDSTRING, 0,
+                   reinterpret_cast<LPARAM>(proId.c_str()));
+    }
+    SendMessageW(hComboBox1, CB_SETCURSEL, 0, 0);
+
+    SetWindowTextW(hParamLabel2, L"Product Type:");
+    SendMessageW(hComboBox2, CB_ADDSTRING, 0,
+                 reinterpret_cast<LPARAM>(L"1 - kTypeInApp"));
+    SendMessageW(hComboBox2, CB_SETCURSEL, 0, 0);
+  }
+
+  void PopulateBillingProgramCombo() {
+    HideLabelsComboBox(1);
+    SetWindowTextW(hParamLabel1, L"billing_program:");
+    SendMessageW(
+        hComboBox1, CB_ADDSTRING, 0,
+        reinterpret_cast<LPARAM>(L"1 - kBillingProgramAlternativeBillingOnly"));
+    SendMessageW(hComboBox1, CB_ADDSTRING, 0,
+                 reinterpret_cast<LPARAM>(L"2 - kBillingProgramUserChoice"));
+    SendMessageW(hComboBox1, CB_SETCURSEL, 0, 0);
+  }
+
+  void OnSelectedIsBillingProgramAvailable() {
+    if (!mBillingClient) {
+      SetResultText("Error: Initialize the Billing SDK first.");
+      HideLabelsComboBox(0);
+      return;
+    }
+    GameLogging::Info("Selected IsBillingProgramAvailable");
+    PopulateBillingProgramCombo();
+  }
+
+  void OnSelectedCreateBillingProgramReportingDetails() {
+    if (!mBillingClient) {
+      SetResultText("Error: Initialize the Billing SDK first.");
+      HideLabelsComboBox(0);
+      return;
+    }
+    GameLogging::Info("Selected CreateBillingProgramReportingDetails");
+    PopulateBillingProgramCombo();
+  }
+
+  void OnSelectedLaunchPurchaseFlow() {
+    if (!mBillingClient) {
+      SetResultText("Error: Initialize the Billing SDK first.");
+      HideLabelsComboBox(0);
+      return;
+    }
+    mAvailableOfferTokens.clear();
+    for (const auto& prod : mQueryProdResValue.product_details) {
+      for (const auto& offer : prod.product_offers) {
+        if (!offer.offer_token.empty()) {
+          mAvailableOfferTokens.push_back(offer.offer_token);
+        }
+      }
+    }
+    if (mAvailableOfferTokens.empty()) {
+      SetResultText(
+          "Error: No product offers available. Run 'Query Product Details' "
+          "first and verify the SKU has an active offer.");
+      HideLabelsComboBox(0);
+      return;
+    }
+
+    GameLogging::Info("Selected Launch Purchase Flow");
+    HideLabelsComboBox(1);
+    SetWindowTextW(hParamLabel1, L"offer_token:");
+    for (const auto& token : mAvailableOfferTokens) {
+      std::wstring wToken = stringToWstring(token);
+      SendMessageW(hComboBox1, CB_ADDSTRING, 0,
+                   reinterpret_cast<LPARAM>(wToken.c_str()));
+    }
+    SendMessageW(hComboBox1, CB_SETCURSEL, 0, 0);
+  }
+
+  void OnSelectedQueryPurchases() {
+    if (!mBillingClient) {
+      SetResultText("Error: Initialize the Billing SDK first.");
+      HideLabelsComboBox(0);
+      return;
+    }
+    GameLogging::Info("Selected Query Purchases");
+    HideLabelsComboBox(0);
+  }
+
+  void PopulatePurchaseTokensCombo(bool unacknowledgedOnly) {
+    HideLabelsComboBox(1);
+    SetWindowTextW(hParamLabel1, L"purchase_token:");
+    int count = 0;
+    for (const auto& purchase : mKnownPurchases) {
+      if (purchase.purchase_token.empty()) continue;
+      if (purchase.purchase_state != PurchaseState::kPurchaseStatePurchased) {
+        continue;
+      }
+      if (unacknowledgedOnly && purchase.is_acknowledged) {
+        continue;
+      }
+      std::wstring wToken = stringToWstring(purchase.purchase_token);
+      SendMessageW(hComboBox1, CB_ADDSTRING, 0,
+                   reinterpret_cast<LPARAM>(wToken.c_str()));
+      ++count;
+    }
+    if (count > 0) {
+      SendMessageW(hComboBox1, CB_SETCURSEL, 0, 0);
+    } else {
+      SetResultText(
+          "No eligible PURCHASED tokens cached yet.\r\nRun 'Launch Purchase "
+          "Flow' or 'Query Purchases' first.");
+    }
+  }
+
+  void OnSelectedAcknowledgePurchase() {
+    if (!mBillingClient) {
+      SetResultText("Error: Initialize the Billing SDK first.");
+      HideLabelsComboBox(0);
+      return;
+    }
+    GameLogging::Info("Selected Acknowledge Purchase");
+    PopulatePurchaseTokensCombo(/*unacknowledgedOnly=*/true);
+  }
+
+  void OnSelectedConsumePurchase() {
+    if (!mBillingClient) {
+      SetResultText("Error: Initialize the Billing SDK first.");
+      HideLabelsComboBox(0);
+      return;
+    }
+    GameLogging::Info("Selected Consume Purchase");
+    PopulatePurchaseTokensCombo(/*unacknowledgedOnly=*/false);
+  }
+
+  void OnSelectedPrepareIntegrityToken() {
+    GameLogging::Info("Selected Prepare Integrity Token");
+    HideLabelsComboBox(1);
+    SetWindowTextW(hParamLabel1, L"project_number:");
+    std::wstring projStr =
+        std::to_wstring(manifest.App.cloudProjectNumber);
+    SendMessageW(hComboBox1, CB_ADDSTRING, 0,
+                 reinterpret_cast<LPARAM>(projStr.c_str()));
+    SendMessageW(hComboBox1, CB_SETCURSEL, 0, 0);
+  }
+
+  void OnSelectedRequestIntegrityToken() {
+    GameLogging::Info("Selected Request Integrity Token");
+    HideLabelsComboBox(0);
+    if (!mPrepareIntegrityTokenResValue.has_value()) {
+      SetResultText(
+          "Note: Run 'Prepare Integrity Token' before requesting a token.");
+    }
+  }
+
+  void OnSelectedVerifyIntegrityToken() {
+    GameLogging::Info("Selected Verify Integrity Token");
+    HideLabelsComboBox(0);
+    if (!mRequestIntegrityTokenResValue.has_value()) {
+      SetResultText(
+          "Note: Run 'Request Integrity Token' before verifying with backend.");
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Execution Handlers (Play Games PC SDK 26.9.261.0+)
+  // ---------------------------------------------------------------------------
+
+  // 1. Initialize Billing SDK
+  void OnClickInitializeSdk() {
+    SetResultText("Initializing Play Games PC SDK...");
+    std::string pkgName = manifest.App.PackageName;
+
+    RunAsyncOperation([this, pkgName]() -> std::function<void()> {
+      auto promise = std::make_shared<std::promise<InitializeResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
+      GooglePlayInitializeParams initParams;
+      if (!pkgName.empty() && pkgName != "your-package-id") {
+        initParams.package_name = pkgName;
+      }
+
+      GooglePlayInitialize(
+          [promise, settled](InitializeResult result) {
+            SetPromiseOnce(promise, settled, std::move(result));
+          },
+          initParams);
+
+      InitializeResult initResult = promise->get_future().get();
+
+      return [this, result = std::move(initResult)]() {
+        if (!result.ok()) {
+          std::string errorDetail;
+          bool mustExitProcess = false;
+
+          switch (result.code()) {
+            case InitializationError::kActionRequiredShutdownClientProcess:
+              errorDetail =
+                  "kActionRequiredShutdownClientProcess (2): Game must be "
+                  "launched via Google Play Games client. Exiting process now "
+                  "so Google Play Games can relaunch safely.";
+              mustExitProcess = true;
+              break;
+            case InitializationError::kSdkRuntimeUpdateRequired:
+              errorDetail =
+                  "kSdkRuntimeUpdateRequired (3): Please update Google Play "
+                  "Games on PC and the SDK runtime.";
+              break;
+            case InitializationError::kSdkRuntimeUnavailable:
+              errorDetail =
+                  "kSdkRuntimeUnavailable (4): Google Play Games SDK runtime "
+                  "service is unavailable or not running.";
+              break;
+            case InitializationError::kSdkRuntimeNotInstalled:
+              errorDetail =
+                  "kSdkRuntimeNotInstalled (5): Google Play Games on PC is not "
+                  "installed on this machine.";
+              break;
+            case InitializationError::kError:
             default:
-                //return DefWindowProc(hwndDlg, uMsg, wParam, lParam);
-                break;
+              errorDetail = std::format(
+                  "Initialization failed with code {}: {}",
+                  static_cast<int>(result.code()), result.error_message());
+              break;
+          }
+
+          GameLogging::Error(errorDetail);
+          SetResultText(errorDetail);
+          MessageBoxW(m_hWnd, stringToWstring(errorDetail).c_str(),
+                      L"SDK Initialization Error", MB_OK | MB_ICONERROR);
+
+          if (mustExitProcess) {
+            InvalidateUiState();
+            EndDialog(m_hWnd, 1);
+            PostQuitMessage(1);
+          }
+          return;
+        }
+
+        mSdkInitialized = true;
+        BillingClientParams clientParams;
+        clientParams.enable_pending_purchases = true;
+        mBillingClient = std::make_shared<BillingClient>(clientParams);
+
+        if (!mIntegrityClient) {
+          mIntegrityClient = std::make_shared<IntegrityClient>();
+        }
+
+        const auto& val = result.value();
+        std::ostringstream msg;
+        msg << "SDK Initialization completed successfully.\r\n"
+            << "Environment: " << EnvironmentToString(val.environment) << "\r\n"
+            << "FormFactor: " << FormFactorToString(val.form_factor) << "\r\n"
+            << "BillingClient & IntegrityClient created.";
+        GameLogging::Info(msg.str());
+        SetResultText(msg.str());
+        SetForegroundWindow(m_hWnd);
+      };
+    });
+  }
+
+  // 2. Query Product Details
+  void OnClickQueryProductDetails() {
+    if (!mBillingClient) {
+      SetResultText("Error: SDK not initialized.");
+      return;
+    }
+
+    int nProdIdx = 0;
+    int nProdTypeIdx = 0;
+    std::string sProdID;
+    std::string sProdType;
+    GetComboBoxText(hComboBox1, nProdIdx, sProdID);
+    GetComboBoxText(hComboBox2, nProdTypeIdx, sProdType);
+
+    if (sProdID.empty()) {
+      SetResultText("Error: Product ID is empty. Check <SKU> in manifest.xml.");
+      return;
+    }
+
+    ProductId prodId;
+    prodId.id = sProdID;
+    prodId.product_type = ProductType::kTypeInApp;
+
+    QueryProductDetailsParams queryParams;
+    queryParams.product_ids.push_back(prodId);
+
+    SetResultText("Querying product details for '" + sProdID + "'...");
+    GameLogging::Info(std::format(
+        "QueryProductDetails: product_id='{}', product_type=kTypeInApp(1)",
+        sProdID));
+
+    auto client = mBillingClient;
+    RunAsyncOperation(
+        [this, client, queryParams, sProdID]() -> std::function<void()> {
+          auto promise =
+              std::make_shared<std::promise<QueryProductDetailsResult>>();
+          auto settled = std::make_shared<std::atomic_bool>(false);
+          client->QueryProductDetails(
+              queryParams, [promise, settled](QueryProductDetailsResult r) {
+                SetPromiseOnce(promise, settled, std::move(r));
+              });
+          QueryProductDetailsResult res = promise->get_future().get();
+
+          return [this, sProdID, result = std::move(res)]() {
+            if (!result.ok()) {
+              std::ostringstream err;
+              err << "QueryProductDetails failed for '" << sProdID << "'\r\n"
+                  << "Code: " << static_cast<int>(result.code()) << " ("
+                  << GetBillingErrorDescription(result.code()) << ")\r\n"
+                  << "Message: " << result.error_message();
+              GameLogging::Error(err.str());
+              SetResultText(err.str());
+              return;
             }
 
-            return FALSE;
-        }
+            mQueryProdResValue = result.value();
+            std::ostringstream out;
+            out << "QueryProductDetails succeeded ("
+                << mQueryProdResValue.product_details.size()
+                << " product(s)).";
 
-        void HideLabelsComboBox(int numPar) {
-            ShowWindow(hParamLabel1, SW_HIDE);
-            ShowWindow(hParamLabel2, SW_HIDE);
-            ShowWindow(hParamLabel3, SW_HIDE);
-            ShowWindow(hComboBox1, SW_HIDE);
-            ShowWindow(hComboBox2, SW_HIDE);
-            ShowWindow(hComboBox3, SW_HIDE);
-            ShowWindow(hParamStatus, SW_HIDE);
-            SendMessage(hComboBox1, CB_RESETCONTENT, 0, 0);
-            SendMessage(hComboBox2, CB_RESETCONTENT, 0, 0);
-            SendMessage(hComboBox3, CB_RESETCONTENT, 0, 0);
-            switch (numPar) {
-            case 3:
-                ShowWindow(hParamLabel3, SW_SHOW);
-                ShowWindow(hComboBox3, SW_SHOW);
-                //break;
-            case 2:
-                ShowWindow(hParamLabel2, SW_SHOW);
-                ShowWindow(hComboBox2, SW_SHOW);
-                //break;
-            case 1:
-                ShowWindow(hParamLabel1, SW_SHOW);
-                ShowWindow(hComboBox1, SW_SHOW);
-                break;
-            default:
-                ShowWindow(hParamStatus, SW_SHOW);
-                break;
+            if (mQueryProdResValue.product_details.empty()) {
+              out << "\r\nNo product details found for SKU '" << sProdID
+                  << "' in package '" << manifest.App.PackageName << "'.";
             }
-        }
 
-        void OnListItemSelected(HWND hwndDlg) {
-            HWND hListBox = GetDlgItem(hwndDlg, IDC_ListOperation);
-            HFONT hFont = (HFONT)GetStockObject(DEFAULT_GUI_FONT);
-            SendMessage(hComboBox1, WM_SETFONT, (WPARAM)hFont, TRUE);
-            SendMessage(hComboBox2, WM_SETFONT, (WPARAM)hFont, TRUE);
-            SendMessage(hComboBox2, WM_SETFONT, (WPARAM)hFont, TRUE);
-            SetWindowText(hResult, L"");
-            m_nSelectedOperation = (int)SendMessage(hListBox, LB_GETCURSEL, 0, 0);
-            if (m_nSelectedOperation != LB_ERR) {
-                wchar_t text[256] = { 0 };
-                SendMessage(hListBox, LB_GETTEXT, (WPARAM)m_nSelectedOperation, (LPARAM)text);
-                SetWindowText(GetDlgItem(hwndDlg, IDC_Function), text);
-                appEvents[m_nSelectedOperation].onSelect(this);
-            }
-        }
+            for (const auto& detail : mQueryProdResValue.product_details) {
+              out << "\r\nProduct:"
+                  << "\r\n  id: " << detail.id
+                  << "\r\n  title: " << detail.title
+                  << "\r\n  name: " << detail.name
+                  << "\r\n  description: " << detail.description;
 
-        // OnInitDialog implemented inside the class
-        void OnInitDialog(HWND hwndDlg) {
-            m_hWnd = hwndDlg;
-            ParseXmlFile("manifest.xml", manifest);
-            hComboBox1 = GetDlgItem(hwndDlg, IDC_Param1);
-            hComboBox2 = GetDlgItem(hwndDlg, IDC_Param2);
-            hComboBox3 = GetDlgItem(hwndDlg, IDC_Param3);
-            hParamLabel1 = GetDlgItem(hwndDlg, IDC_Parameter1);
-            hParamLabel2 = GetDlgItem(hwndDlg, IDC_Parameter2);
-            hParamLabel3 = GetDlgItem(hwndDlg, IDC_Parameter3);
-            hParamStatus = GetDlgItem(hwndDlg, IDC_ParamStatus);
-            hResult = GetDlgItem(hwndDlg, IDC_Result);
-            HideLabelsComboBox(0);
-        }
-
-        void GetComboBoxText(HWND combo, int& index, string& ret) {
-            index = (int)SendMessage(combo, CB_GETCURSEL, 0, 0);
-            if (index != CB_ERR) {
-                // CB_GETLBTEXT does NOT truncate. Purchase/offer tokens can
-                // exceed 255 chars, so size the buffer based on value from
-                // CB_GETLBTEXTLEN.
-                LRESULT len = SendMessage(combo, CB_GETLBTEXTLEN, index, 0);
-                if (len == CB_ERR) return;
-                std::wstring wstr(static_cast<size_t>(len) + 1, L'\0');
-                SendMessage(combo, CB_GETLBTEXT, index, (LPARAM)wstr.data());
-                wstr.resize(static_cast<size_t>(len));
-                ret = wstringTostring(wstr);
-            }
-        }
-
-        // OnRunButtonClicked implemented inside the class
-        void OnRunButtonClicked() {
-            try {
-                if (m_nSelectedOperation == -1) {
-                    string mess = "Warning - Select an operation";
-                    GameLogging::Info(mess);
-                    SetWindowText(hResult, stringToWstring(mess).c_str());
-                    return;
+              for (const auto& offer : detail.product_offers) {
+                double priceUnits =
+                    static_cast<double>(offer.price_micros) / 1000000.0;
+                out << "\r\n  Offer: " << offer.formatted_price << " ("
+                    << std::format("{:.2f}", priceUnits) << " "
+                    << offer.currency_code << ")";
+                if (offer.full_price_micros > 0) {
+                  double fullUnits =
+                      static_cast<double>(offer.full_price_micros) / 1000000.0;
+                  out << " [Full Price: "
+                      << std::format("{:.2f}", fullUnits) << " "
+                      << offer.currency_code << "]";
                 }
-                appEvents[m_nSelectedOperation].onClick(this);
-            }
-            catch (exception e) {
-                GameLogging::Error("Exception in " + wstringTostring(
-                    ListBoxItems[m_nSelectedOperation]) + " at " + e.what());
-            }
-        }
-        void OnSelectedInitializeSdk(void* ptr) {
-            GameLogging::Info("Selected Initialize Sdk");
-            HideLabelsComboBox(0);
-        }
-
-        void OnSelectedQueryProductDetails(void* ptr) {
-            if (mBillingClient == nullptr) {
-                string mess = "Error - Initization the SDK";
-                GameLogging::Info(mess);
-                SetWindowText(hResult, stringToWstring(mess).c_str());
-                return;
-            }
-            GameLogging::Info("Selected Query Product Details");
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            HideLabelsComboBox(2);
-            mProductid.id = win->manifest.App.sku;
-            mProductid.product_type = ProductType::kTypeInApp;
-            SetWindowText(hParamLabel1, L"Product ID:");
-            wstring proId = stringToWstring(manifest.App.sku.c_str());
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)proId.c_str());
-            SendMessage(hComboBox1, CB_SETCURSEL, 0, 0);
-            SetWindowText(hParamLabel2, L"Product Type:");
-            SendMessage(hComboBox2, CB_ADDSTRING, 0, (LPARAM)stringToWstring("0 - NULL").c_str());
-            SendMessage(hComboBox2, CB_ADDSTRING, 0, (LPARAM)stringToWstring("1 - TypeInApp").c_str());// L"NULL");
-            SendMessage(hComboBox2, CB_SETCURSEL, 1, 1);
-        }
-
-        void OnSelectedIsBillingProgramAvailable(void* ptr) {
-            if (mBillingClient == nullptr) {
-                string mess = "Error - Initization the SDK";
-                GameLogging::Info(mess);
-                SetWindowText(hResult, stringToWstring(mess).c_str());
-                return;
-            }
-            GameLogging::Info("Selected Is Billing Program Available");
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            HideLabelsComboBox(1);
-            SetWindowText(hParamLabel1, L"billing_program:");
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)L"0 - No billing program");
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)L"1 - kBillingProgramAlternativeBillingOnly");
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)L"2 - kBillingProgramUserChoice");
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)L"3 - kBillingProgramExternalOffers");
-            SendMessage(hComboBox1, CB_SETCURSEL, 1, 1);
-        }
-
-        void OnSelectedCreateBillingProgramReportingDetails(void* ptr) {
-            if (mBillingClient == nullptr) {
-                string mess = "Error - Initization the SDK";
-                GameLogging::Info(mess);
-                SetWindowText(hResult, stringToWstring(mess).c_str());
-                return;
-            }
-            GameLogging::Info("Selected Create Billing Program Report");
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            HideLabelsComboBox(1);
-            SetWindowText(hParamLabel1, L"billing_program:");
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)L"0 - No billing program");
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)L"1 - kBillingProgramAlternativeBillingOnly");
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)L"2 - kBillingProgramUserChoice");
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)L"3 - kBillingProgramExternalOffers");
-            SendMessage(hComboBox1, CB_SETCURSEL, 1, 1);
-        }
-
-        void OnSelectedLaunchPurchaseFlow(void* ptr) {
-            if (mBillingClient == nullptr || mQueryPrudResValue.product_details.size() == 0) {
-                string mess = "Error - \r\n1.Initization the SDK\r\n2. Missing product details";
-                GameLogging::Info(mess);
-                SetWindowText(hResult, stringToWstring(mess).c_str());
-                return;
-            }
-            GameLogging::Info("Selected Launch Purchase Flow");
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            HideLabelsComboBox(1);
-            SetWindowText(hParamLabel1, L"offer_token:");
-
-            string offerToken = mQueryPrudResValue.product_details[0].product_offers[0].offer_token;
-
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)stringToWstring(offerToken.c_str()).c_str());
-            SendMessage(hComboBox1, CB_SETCURSEL, 0, 0);
-        }
-
-        void OnSelectedAcknowledgePurchase(void* ptr) {
-            if (mBillingClient == nullptr) {
-                string mess = "Error - Initization the SDK";
-                GameLogging::Info(mess);
-                SetWindowText(hResult, stringToWstring(mess).c_str());
-                return;
-            }
-            GameLogging::Info("Selected Acknowledge Purchase");
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            HideLabelsComboBox(1);
-            SetWindowText(hParamLabel1, L"Purchase token:");
-            string purchaseToken = mLaunchPurchaseFlowResValue.product_purchase_details.purchase_token;
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)stringToWstring(purchaseToken.c_str()).c_str());
-            SendMessage(hComboBox1, CB_SETCURSEL, 0, 0);
-        }
-
-        void OnSelectedConsumePurchase(void* ptr) {
-            if (mBillingClient == nullptr) {
-                string mess = "Error - Initization the SDK";
-                GameLogging::Info(mess);
-                SetWindowText(hResult, stringToWstring(mess).c_str());
-                return;
-            }
-            GameLogging::Info("Selected Consume Purchase");
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            HideLabelsComboBox(1);
-            SetWindowText(hParamLabel1, L"Purchase token:");
-            string purchaseToken = mLaunchPurchaseFlowResValue.product_purchase_details.purchase_token;
-            SendMessage(hComboBox1, CB_ADDSTRING, 0, (LPARAM)stringToWstring(purchaseToken.c_str()).c_str());
-            SendMessage(hComboBox1, CB_SETCURSEL, 0, 0);
-        }
-
-
-        void OnClickInitializeSdk(void* ptr)
-        {
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            try {
-                // Play_SDK+0.8.0 dll & libs
-                // Initialize the SDK as part of the startup sequence of your application.
-                auto promise = std::make_shared<std::promise<InitializeResult>>();
-                GooglePlayInitialize(
-                    [promise](InitializeResult result) {
-                        promise->set_value(std::move(result));
-                    });
-
-                auto initialize_result = promise->get_future().get();
-                int initReturn = initialize_result.ok();
-                wstring message = L"";
-
-                if (!initialize_result.ok()) {
-                    switch (initReturn) {
-                    case (int)InitializationError::kError: {
-                        message = L"Fatal error during initialization.";
-                    }break;
-                    case (int)InitializationError::kActionRequiredShutdownClientProcess: {
-                        message = L"The user will need to update Google Play Games and the SDK runtime in order to proceed.";
-                    }break;
-                    case (int)InitializationError::kSdkRuntimeUpdateRequired: {
-                        message = L"The user will need to update Google Play Games and the SDK runtime in order to proceed.";
-                    }break;
-                    default:
-                        message = L"Unknow SDK initialzation error";
-                    }
-                    MessageBox(win->m_hWnd, message.c_str(), L"Error", MB_OK);
-                    return;
-                }
-                m_bCanMoveToStage = true;
-                BillingClientParams params;
-                params.enable_pending_purchases = true;
-                win->mBillingClient = new BillingClient(params);
-                message = L"SDK Initialization completed successfully. \r\nBilling client created.";
-                GameLogging::Info(wstringTostring(message.c_str()));
-                SetWindowText(win->hResult, message.c_str());
-                SetForegroundWindow(m_hWnd);
-            }
-            catch (exception e) {
-                GameLogging::Error(std::format("SDK initialization Failed with exception {}", e.what()));
-            }
-        }
-
-        string GetBillingProgram(int nProgID) {
-            switch (nProgID) {
-            case 1:
-                return "1 - kBillingProgramAlternativeBillingOnly";
-            case 2:
-                return "2 - kBillingProgramUserChoice";
-            default:
-                return "Unknown billing program";
-            }
-        }
-
-        void OnClickIsBillingProgramAvailable(void* ptr)
-        {
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            if (win->mBillingClient == nullptr) {
-                string mess = "Error - SDK not initialized";
-                GameLogging::Info(mess);
-                SetWindowText(hResult, stringToWstring(mess).c_str());
-                return;
+                out << "\r\n    offer_token: " << offer.offer_token;
+              }
             }
 
-            stringstream message;
-            SetWindowText(win->hResult, L"IsBillingProgramAvailable initialized");
-            try {
-                IsBillingProgramAvailableParams param;
-                int nProgID;
-                string sProgID;
-                GetComboBoxText(hComboBox1, nProgID, sProgID);
-                param.billing_program = (BillingProgram)nProgID;
-                auto promise = std::make_shared<std::promise<IsBillingProgramAvailableResult>>();
-                win->mBillingClient->IsBillingProgramAvailable(
-                    param, [promise](IsBillingProgramAvailableResult r) {
-                        promise->set_value(std::move(r));
-                    }
-                );
-                auto billingProgramAvailableResult = promise->get_future().get();
-                if (!billingProgramAvailableResult.ok()) {
-                    message << "\rWarning in IsBillingProgramAvailable: with billing program option:" << GetBillingProgram(nProgID) << "\r\nError:" << billingProgramAvailableResult.error_message();
-                    message << "\r\n\t error_message: " << sdkErrorMsg[(BillingError)billingProgramAvailableResult.code()];;
-                    SetWindowText(hResult, stringToWstring(message.str()).c_str());
-                    GameLogging::Error(message.str());
-                    m_bCanMoveToStage = false;
-                }
-                else {
-                    message << "\r\nIsBillingProgramAvailable: Successfull and ready to buy";
-                    SetWindowText(hResult, stringToWstring(message.str()).c_str());
-                    m_bCanMoveToStage = true;
-                    GameLogging::Info(message.str());
-                }
-            }
-            catch (exception e) {
-                GameLogging::Error(std::format("IsBillingProgramAvailable Failed with excetion {}", e.what()));
-            }
-        }
-
-        void OnClickCreateBillingProgramReportingDetails(void* ptr)
-        {
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            if (win->mBillingClient == nullptr) {
-                string mess = "Error - SDK not initialized";
-                GameLogging::Info(mess);
-                SetWindowText(hResult, stringToWstring(mess).c_str());
-                return;
-            }
-
-            stringstream message;
-            SetWindowText(win->hResult, L"CreateBillingProgramReportingDetails initialized");
-            try {
-                //message << "product id: " << mProductid.id << " product type: " << mProductid.product_type;
-                CreateBillingProgramReportingDetailsParams params;
-                int nProgID;
-                string sProgID;
-                GetComboBoxText(hComboBox1, nProgID, sProgID);
-                params.billing_program = (BillingProgram)nProgID;
-                auto promise = std::make_shared<std::promise<CreateBillingProgramReportingDetailsResult>>();
-                win->mBillingClient->CreateBillingProgramReportingDetails(
-                    params, [promise](CreateBillingProgramReportingDetailsResult r) {
-                        promise->set_value(std::move(r));
-                    });
-                auto createBillingReport = promise->get_future().get();
-                if (!createBillingReport.ok()) {
-                    m_bCanMoveToStage = false;
-                    message << "\rWarning CreateBillingProgramReportingDetails with option:" << GetBillingProgram(nProgID);
-                    message << "\r\nt error_message: " << sdkErrorMsg[(BillingError)createBillingReport.code()] << " error message " << createBillingReport.error_message();
-                    SetWindowText(hResult, stringToWstring(message.str()).c_str());
-                    GameLogging::Error(message.str());
-                }
-                else {
-                    m_bCanMoveToStage = true;
-                    message << "\r\nCreateBillingProgramReportingDetails: Successfull and ready to buy";
-                    SetWindowText(hResult, stringToWstring(message.str()).c_str());
-                    GameLogging::Info(message.str());
-                }
-            }
-            catch (exception e) {
-                GameLogging::Error(std::format("CreateBillingProgramReportingDetails Failed with excetion {}", e.what()));
-            }
-        }
-
-        void OnClickQueryProductDetails(void* ptr)
-        {
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            if (!win->mBillingClient) {
-                wstring mess = L"Error: \r\nSDK not initialized";
-                SetWindowText(win->hResult, mess.c_str());
-                MessageBox(win->m_hWnd, mess.c_str(), L"Error", MB_OK);
-                return;
-            }
-            SetWindowText(win->hResult, L"Billingclient initialized");
-            GameLogging::Info("Fetching details of a product I'd like to purchase...");
-            stringstream message;
-            int nProdId = 0, nProdType = 0;
-            string sProdID, sProdType;
-            GetComboBoxText(hComboBox1, nProdId, sProdID);
-            GetComboBoxText(hComboBox2, nProdType, sProdType);
-
-            message << "\r\n\tproduct id: " << nProdId << "\r\n\tproduct type: " << nProdType;
-            QueryProductDetailsParams param;
-            mProductid.id = sProdID;
-            mProductid.product_type = (ProductType)nProdType;
-            param.product_ids.push_back(mProductid);
-            GameLogging::Info(message.str());
-            auto promise = std::make_shared<std::promise<QueryProductDetailsResult>>();
-            ((BillingClient*)win->mBillingClient)->QueryProductDetails(
-                param, [promise](QueryProductDetailsResult r) {
-                    promise->set_value(std::move(r));
-                });
-            auto queryProductDetailsResult = promise->get_future().get();
-            if (!queryProductDetailsResult.ok()) {
-                int code = (int)queryProductDetailsResult.code();
-                stringstream message;
-                message << "Failed to query \r\n\tproductId: " << mProductid.id << "\r\n\tProduct Type: ";
-                message << mProductid.product_type << "\r\nstatus was: " << (int)queryProductDetailsResult.code();
-                string m = sdkErrorMsg[(BillingError)code];
-                message << "\r\n\tmess - " << m;// queryProductDetailsResult.error_message();
-                GameLogging::Error(message.str());
-                string emessage = "Error: " + message.str();
-                SetWindowText(win->hResult, stringToWstring(emessage).c_str());
-                m_bCanMoveToStage = false;
-                return;// FALSE;
-            }
-
-            const auto& queryProductDetailsResultValue =
-                queryProductDetailsResult.value();
-            GameLogging::Info("Done.\nNow let's try to purchase this:");
-            SetWindowText(win->hResult, L"queryProductDetailsResultValue - Done");
-            stringstream messProd;
-            messProd << "queryProductDetailsResultValue - Done";
-            if (queryProductDetailsResultValue.product_details.size() == 0) {
-                messProd << "\r\nNo product details for the Package Name: " + manifest.App.PackageName;
-                SetWindowText(win->hResult, stringToWstring(messProd.str()).c_str());
-                MessageBox(win->m_hWnd, stringToWstring(messProd.str()).c_str(), L"Error", MB_OK);
-            }
-            for (const auto& detail : queryProductDetailsResultValue.product_details) {
-                messProd << "\r\nProduct: \r\n\tid: " << detail.id << "\n\ttitle: " << detail.title;
-                messProd << "\r\n\tname: " << detail.name << "\r\n\tdescription: " << detail.description;
-                //detail.product_offers[0].formatted_price
-                for (const auto& offer : detail.product_offers) {
-
-                    string doubleString = std::to_string((double)offer.price_micros / 1000000);
-                    string currency = offer.currency_code;
-                    string formatedPrice = offer.formatted_price;
-                    string offer = std::format("\r\n\tOffer: {} {}", doubleString, currency);
-                    messProd << offer << "\r\n\tformatted_price: " << formatedPrice;
-                }
-            }
-            mQueryPrudResValue = queryProductDetailsResultValue;
-            SetWindowText(win->hResult, stringToWstring(messProd.str()).c_str());
-            GameLogging::Info(messProd.str());
-            m_bCanMoveToStage = true;
+            GameLogging::Info(out.str());
+            SetResultText(out.str());
             SetForegroundWindow(m_hWnd);
+          };
+        });
+  }
+
+  // Helper to resolve selected BillingProgram from ComboBox index (0 -> 1, 1 -> 2)
+  bool ReadSelectedBillingProgram(BillingProgram& outProgram) {
+    int selIndex = -1;
+    std::string selText;
+    GetComboBoxText(hComboBox1, selIndex, selText);
+    if (selIndex == 0) {
+      outProgram = BillingProgram::kBillingProgramAlternativeBillingOnly;
+      return true;
+    }
+    if (selIndex == 1) {
+      outProgram = BillingProgram::kBillingProgramUserChoice;
+      return true;
+    }
+    SetResultText("Error: Please select a valid BillingProgram (1 or 2).");
+    return false;
+  }
+
+  // 3. IsBillingProgramAvailable
+  void OnClickIsBillingProgramAvailable() {
+    if (!mBillingClient) {
+      SetResultText("Error: SDK not initialized.");
+      return;
+    }
+
+    BillingProgram program{};
+    if (!ReadSelectedBillingProgram(program)) {
+      return;
+    }
+
+    IsBillingProgramAvailableParams param{program};
+    SetResultText("Checking IsBillingProgramAvailable for " +
+                  BillingProgramToString(program) + "...");
+
+    auto client = mBillingClient;
+    RunAsyncOperation(
+        [this, client, param, program]() -> std::function<void()> {
+          auto promise =
+              std::make_shared<std::promise<IsBillingProgramAvailableResult>>();
+          auto settled = std::make_shared<std::atomic_bool>(false);
+          client->IsBillingProgramAvailable(
+              param, [promise, settled](IsBillingProgramAvailableResult r) {
+                SetPromiseOnce(promise, settled, std::move(r));
+              });
+          IsBillingProgramAvailableResult res = promise->get_future().get();
+
+          return [this, program, result = std::move(res)]() {
+            std::ostringstream msg;
+            if (!result.ok()) {
+              msg << "IsBillingProgramAvailable ("
+                  << BillingProgramToString(program) << ") -> NOT AVAILABLE\r\n"
+                  << "Code: " << static_cast<int>(result.code()) << " ("
+                  << GetBillingErrorDescription(result.code()) << ")\r\n"
+                  << "Message: " << result.error_message();
+              GameLogging::Warning(msg.str());
+            } else {
+              msg << "IsBillingProgramAvailable ("
+                  << BillingProgramToString(program)
+                  << ") -> AVAILABLE and eligible.";
+              GameLogging::Info(msg.str());
+            }
+            SetResultText(msg.str());
+          };
+        });
+  }
+
+  // 4. CreateBillingProgramReportingDetails
+  void OnClickCreateBillingProgramReportingDetails() {
+    if (!mBillingClient) {
+      SetResultText("Error: SDK not initialized.");
+      return;
+    }
+
+    BillingProgram program{};
+    if (!ReadSelectedBillingProgram(program)) {
+      return;
+    }
+
+    CreateBillingProgramReportingDetailsParams params{program};
+    SetResultText("Creating billing program reporting details for " +
+                  BillingProgramToString(program) + "...");
+
+    auto client = mBillingClient;
+    RunAsyncOperation([this, client, params, program]() -> std::function<void()> {
+      auto promise = std::make_shared<
+          std::promise<CreateBillingProgramReportingDetailsResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
+      client->CreateBillingProgramReportingDetails(
+          params,
+          [promise, settled](CreateBillingProgramReportingDetailsResult r) {
+            SetPromiseOnce(promise, settled, std::move(r));
+          });
+      CreateBillingProgramReportingDetailsResult res =
+          promise->get_future().get();
+
+      return [this, program, result = std::move(res)]() {
+        std::ostringstream msg;
+        if (!result.ok()) {
+          msg << "CreateBillingProgramReportingDetails ("
+              << BillingProgramToString(program) << ") failed.\r\n"
+              << "Code: " << static_cast<int>(result.code()) << " ("
+              << GetBillingErrorDescription(result.code()) << ")\r\n"
+              << "Message: " << result.error_message();
+          GameLogging::Error(msg.str());
+        } else {
+          mLastExternalTransactionToken =
+              result.value().external_transaction_token;
+          msg << "CreateBillingProgramReportingDetails succeeded!\r\n"
+              << "Program: " << BillingProgramToString(program) << "\r\n"
+              << "external_transaction_token: "
+              << RedactTokenForLog(mLastExternalTransactionToken);
+          GameLogging::Info(msg.str());
+        }
+        SetResultText(msg.str());
+      };
+    });
+  }
+
+  // 5. Launch Purchase Flow
+  void OnClickLaunchPurchaseFlow() {
+    if (!mBillingClient) {
+      SetResultText("Error: SDK not initialized.");
+      return;
+    }
+
+    int selIdx = -1;
+    std::string sOfferToken;
+    GetComboBoxText(hComboBox1, selIdx, sOfferToken);
+    if (sOfferToken.empty()) {
+      SetResultText(
+          "Error: Missing offer_token. Run 'Query Product Details' first.");
+      return;
+    }
+
+    LaunchPurchaseFlowParams flowParams;
+    flowParams.offer_token = sOfferToken;
+    flowParams.quantity = 1;
+
+    SetResultText(
+        "Launching Google Play purchase overlay...\r\n(Complete or cancel "
+        "checkout in the Google Play Games window.)");
+    GameLogging::Info("LaunchPurchaseFlow started");
+
+    auto client = mBillingClient;
+    RunAsyncOperation([this, client, flowParams]() -> std::function<void()> {
+      auto promise = std::make_shared<std::promise<LaunchPurchaseFlowResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
+      client->LaunchPurchaseFlow(flowParams,
+                                 [promise, settled](LaunchPurchaseFlowResult r) {
+                                   SetPromiseOnce(promise, settled, std::move(r));
+                                 });
+      LaunchPurchaseFlowResult res = promise->get_future().get();
+
+      return [this, result = std::move(res)]() {
+        if (!result.ok()) {
+          std::ostringstream err;
+          err << "LaunchPurchaseFlow failed.\r\n"
+              << "Code: " << static_cast<int>(result.code()) << " ("
+              << GetBillingErrorDescription(result.code()) << ")\r\n"
+              << "Message: " << result.error_message();
+          GameLogging::Error(err.str());
+          SetResultText(err.str());
+          SetForegroundWindow(m_hWnd);
+          return;
         }
 
-        void OnClickLaunchPurchaseFlow(void* ptr)
-        {
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            if (!win->mBillingClient || mQueryPrudResValue.product_details.size() == 0) {
-                wstring mess = L"Error may be \r\n1. SDK not initialized or\r\n2. Missing Product details";
-                SetWindowText(win->hResult, mess.c_str());
-                MessageBox(win->m_hWnd, mess.c_str(), L"Error", MB_OK);
-                return;
-            }
-            GameLogging::Info("Launch Purchase Flow");
-            int nOfferToken;
-            string sOfferToken;
-            GetComboBoxText(hComboBox1, nOfferToken, sOfferToken);
-            string off = mQueryPrudResValue.product_details[0].product_offers[0].offer_token;
-            ProductOffer offer_token;
-            LaunchPurchaseFlowParams purchaseFlowParams = { sOfferToken,"","" };
-            auto promise = std::make_shared<std::promise<LaunchPurchaseFlowResult>>();
-            win->mBillingClient->LaunchPurchaseFlow(
-                purchaseFlowParams, [promise](LaunchPurchaseFlowResult r) {
-                    promise->set_value(std::move(r));
-                });
-            auto launchPurchaseFlowResult = promise->get_future().get();
+        const ProductPurchaseDetails& purchase =
+            result.value().product_purchase_details;
+        UpsertKnownPurchase(purchase);
 
-            if (!launchPurchaseFlowResult.ok()) {
-                m_bCanMoveToStage = false;
-                stringstream mess;
-                mess << "purchase flow failed" << std::endl
-                    << (int)launchPurchaseFlowResult.code() << " "
-                    << sdkErrorMsg[(BillingError)launchPurchaseFlowResult.code()] << std::endl;//launchPurchaseFlowResult.error_message() << std::endl;
-                GameLogging::Error(mess.str());
-                SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
-                SetForegroundWindow(m_hWnd);
-                return;
-            }
-            else {
-                const auto& launchPurchaseFlowResultValue =
-                    launchPurchaseFlowResult.value();
-                mLaunchPurchaseFlowResValue = launchPurchaseFlowResult.value();
-                stringstream mess;
-                m_bCanMoveToStage = true;
-                mess << "Successfully completed launch purchase flow purchase" << endl;
-                mess << "\r\nThe purchase token is: " << mLaunchPurchaseFlowResValue.product_purchase_details.purchase_token;
-                GameLogging::Info(mess.str());
-                SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
-            }
+        std::ostringstream out;
+        out << "LaunchPurchaseFlow completed!\r\n"
+            << "  product_id: " << purchase.product_id << "\r\n"
+            << "  order_id: "
+            << (purchase.order_id.empty() ? "(pending)" : purchase.order_id)
+            << "\r\n"
+            << "  purchase_state: "
+            << PurchaseStateToString(purchase.purchase_state) << "\r\n"
+            << "  quantity: " << purchase.quantity << "\r\n"
+            << "  is_acknowledged: "
+            << (purchase.is_acknowledged ? "true" : "false") << "\r\n"
+            << "  purchase_token: " << RedactTokenForLog(purchase.purchase_token);
+
+        if (purchase.purchase_state == PurchaseState::kPurchaseStatePending) {
+          out << "\r\n\r\nNOTE: Purchase is PENDING. Do not grant entitlement "
+                 "or acknowledge/consume until state becomes PURCHASED.";
         }
 
-        void OnClickAcknowledgePurchase(void* ptr)
-        {
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            GameLogging::Info("Acknowledge Purchase");
-            int nPurchaseTokenId;
-            string sPurchaseTokenId;
-            GetComboBoxText(hComboBox1, nPurchaseTokenId, sPurchaseTokenId);
-            if (!win->mBillingClient || sPurchaseTokenId.length() == 0) {
-                wstring mess = L"Error may be\r\n1. SDK not initialized or\r\n2. Missing Purchase token";
-                SetWindowText(win->hResult, mess.c_str());
-                MessageBox(win->m_hWnd, mess.c_str(), L"Error", MB_OK);
-                return;
-            }
-            AcknowledgePurchaseParams ackonwledgeParam{
-                sPurchaseTokenId
-            };
-            auto promise = std::make_shared<std::promise<AcknowledgePurchaseResult>>();
-            win->mBillingClient->AcknowledgePurchase(ackonwledgeParam,
-                [promise](AcknowledgePurchaseResult r) {
-                    promise->set_value(std::move(r));
-                });
-            auto acknowledgePurchaseResult = promise->get_future().get();
+        GameLogging::Info(out.str());
+        SetResultText(out.str());
+        SetForegroundWindow(m_hWnd);
+      };
+    });
+  }
 
-            if (!acknowledgePurchaseResult.ok()) {
-                stringstream mess;
-                mess << "Acknowledge flow failed" << std::endl
-                    << (int)acknowledgePurchaseResult.code() << " "
-                    << sdkErrorMsg[(BillingError)acknowledgePurchaseResult.code()] << std::endl;
-                GameLogging::Error(mess.str());
-                m_bCanMoveToStage = false;
-                SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
-                SetForegroundWindow(m_hWnd);
-                return;
-            }
-            else {
-                const auto& acknowledgePurchaseFlowResultValue =
-                    acknowledgePurchaseResult.value();
-                mAcknowledgePurchaseResultValue = acknowledgePurchaseResult.value();
-                stringstream mess;
-                m_bCanMoveToStage = true;
-                mess << "Successfully completed launch purchase flow purchase" << endl;
-                GameLogging::Info(mess.str());
-                SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
-                SetForegroundWindow(m_hWnd);
-            }
+  // 6. Query Purchases (Purchase Restoration)
+  void OnClickQueryPurchases() {
+    if (!mBillingClient) {
+      SetResultText("Error: SDK not initialized.");
+      return;
+    }
 
-        }
-        void OnClickConsumePurchase(void* ptr)
-        {
-            GameAppBillingSdkDialog* win = (GameAppBillingSdkDialog*)ptr;
-            GameLogging::Info("Consume Purchase");
-            int nPurchaseTokenId;
-            string sPurchaseTokenId;
-            GetComboBoxText(hComboBox1, nPurchaseTokenId, sPurchaseTokenId);
-            if (!win->mBillingClient || sPurchaseTokenId.length() == 0) {
-                wstring mess = L"Error may be\r\n1. SDK not initialized or\r\n2. Missing Purchase token";
-                SetWindowText(win->hResult, mess.c_str());
-                MessageBox(win->m_hWnd, mess.c_str(), L"Error", MB_OK);
-                return;
-            }
-            ConsumePurchaseParams consumePurchaseParams{
-                sPurchaseTokenId
-            };
-            auto promise = std::make_shared<std::promise<ConsumePurchaseResult>>();
-            win->mBillingClient->ConsumePurchase(consumePurchaseParams,
-                [promise](ConsumePurchaseResult r) {
-                    promise->set_value(std::move(r));
-                });
-            auto consumePurchaseResult = promise->get_future().get();
+    SetResultText("Querying existing purchases for current user...");
+    GameLogging::Info("QueryPurchases started");
 
-            if (!consumePurchaseResult.ok()) {
-                stringstream mess;
-                mess << "Consume flow failed" << std::endl
-                    << (int)consumePurchaseResult.code() << " "
-                    << sdkErrorMsg[(BillingError)consumePurchaseResult.code()] << std::endl;
-                GameLogging::Error(mess.str());
-                SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
-                SetForegroundWindow(m_hWnd);
-                m_bCanMoveToStage = false;
-                return;
-            }
-            else {
-                mConsumePurchaseResultValue = consumePurchaseResult.value();
-                stringstream mess;
+    auto client = mBillingClient;
+    RunAsyncOperation([this, client]() -> std::function<void()> {
+      auto promise = std::make_shared<std::promise<QueryPurchasesResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
+      client->QueryPurchases([promise, settled](QueryPurchasesResult r) {
+        SetPromiseOnce(promise, settled, std::move(r));
+      });
+      QueryPurchasesResult res = promise->get_future().get();
 
-                mess << "Successfully completed consume purchase flow Done." << endl;
-                GameLogging::Info(mess.str());
-                SetWindowText(win->hResult, stringToWstring(mess.str()).c_str());
-                SetForegroundWindow(m_hWnd);
-                m_bCanMoveToStage = true;
-            }
+      return [this, result = std::move(res)]() {
+        if (!result.ok()) {
+          std::ostringstream err;
+          err << "QueryPurchases failed.\r\n"
+              << "Code: " << static_cast<int>(result.code()) << " ("
+              << GetBillingErrorDescription(result.code()) << ")\r\n"
+              << "Message: " << result.error_message();
+          GameLogging::Error(err.str());
+          SetResultText(err.str());
+          return;
         }
 
-        void initializeIntegrityClient() {
-            if (!mIntegrityClient) {
-                mIntegrityClient = new IntegrityClient();
+        const auto& purchases = result.value().product_purchase_details;
+        mKnownPurchases = purchases;
+
+        std::ostringstream out;
+        out << "QueryPurchases succeeded: " << purchases.size()
+            << " active purchase(s) returned.";
+        for (size_t i = 0; i < purchases.size(); ++i) {
+          const auto& p = purchases[i];
+          out << "\r\n[" << (i + 1) << "] product_id: " << p.product_id
+              << " | state: " << PurchaseStateToString(p.purchase_state)
+              << " | ack: " << (p.is_acknowledged ? "true" : "false")
+              << " | qty: " << p.quantity
+              << "\r\n    order_id: " << p.order_id
+              << "\r\n    token: " << RedactTokenForLog(p.purchase_token);
+        }
+        GameLogging::Info(out.str());
+        SetResultText(out.str());
+        SetForegroundWindow(m_hWnd);
+      };
+    });
+  }
+
+  // 7. Acknowledge Purchase
+  void OnClickAcknowledgePurchase() {
+    if (!mBillingClient) {
+      SetResultText("Error: SDK not initialized.");
+      return;
+    }
+
+    int selIdx = -1;
+    std::string sPurchaseToken;
+    GetComboBoxText(hComboBox1, selIdx, sPurchaseToken);
+    if (sPurchaseToken.empty()) {
+      SetResultText(
+          "Error: Missing purchase_token. Complete a purchase or run 'Query "
+          "Purchases' first.");
+      return;
+    }
+
+    AcknowledgePurchaseParams ackParams{sPurchaseToken};
+    SetResultText("Acknowledging purchase...");
+    GameLogging::Info("AcknowledgePurchase started");
+
+    auto client = mBillingClient;
+    RunAsyncOperation(
+        [this, client, ackParams, sPurchaseToken]() -> std::function<void()> {
+          auto promise =
+              std::make_shared<std::promise<AcknowledgePurchaseResult>>();
+          auto settled = std::make_shared<std::atomic_bool>(false);
+          client->AcknowledgePurchase(
+              ackParams, [promise, settled](AcknowledgePurchaseResult r) {
+                SetPromiseOnce(promise, settled, std::move(r));
+              });
+          AcknowledgePurchaseResult res = promise->get_future().get();
+
+          return [this, sPurchaseToken, result = std::move(res)]() {
+            if (!result.ok()) {
+              std::ostringstream err;
+              err << "AcknowledgePurchase failed.\r\n"
+                  << "Code: " << static_cast<int>(result.code()) << " ("
+                  << GetBillingErrorDescription(result.code()) << ")\r\n"
+                  << "Message: " << result.error_message();
+              GameLogging::Error(err.str());
+              SetResultText(err.str());
+              SetForegroundWindow(m_hWnd);
+              return;
             }
+
+            for (auto& p : mKnownPurchases) {
+              if (p.purchase_token == sPurchaseToken) {
+                p.is_acknowledged = true;
+              }
+            }
+
+            std::string msg =
+                "Successfully acknowledged purchase.\r\npurchase_token: " +
+                RedactTokenForLog(sPurchaseToken);
+            GameLogging::Info(msg);
+            SetResultText(msg);
+            SetForegroundWindow(m_hWnd);
+          };
+        });
+  }
+
+  // 8. Consume Purchase
+  void OnClickConsumePurchase() {
+    if (!mBillingClient) {
+      SetResultText("Error: SDK not initialized.");
+      return;
+    }
+
+    int selIdx = -1;
+    std::string sPurchaseToken;
+    GetComboBoxText(hComboBox1, selIdx, sPurchaseToken);
+    if (sPurchaseToken.empty()) {
+      SetResultText(
+          "Error: Missing purchase_token. Complete a purchase or run 'Query "
+          "Purchases' first.");
+      return;
+    }
+
+    ConsumePurchaseParams consumeParams{sPurchaseToken};
+    SetResultText("Consuming purchase...");
+    GameLogging::Info("ConsumePurchase started");
+
+    auto client = mBillingClient;
+    RunAsyncOperation([this, client, consumeParams,
+                       sPurchaseToken]() -> std::function<void()> {
+      auto promise = std::make_shared<std::promise<ConsumePurchaseResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
+      client->ConsumePurchase(consumeParams,
+                              [promise, settled](ConsumePurchaseResult r) {
+                                SetPromiseOnce(promise, settled, std::move(r));
+                              });
+      ConsumePurchaseResult res = promise->get_future().get();
+
+      return [this, sPurchaseToken, result = std::move(res)]() {
+        if (!result.ok()) {
+          std::ostringstream err;
+          err << "ConsumePurchase failed.\r\n"
+              << "Code: " << static_cast<int>(result.code()) << " ("
+              << GetBillingErrorDescription(result.code()) << ")\r\n"
+              << "Message: " << result.error_message();
+          GameLogging::Error(err.str());
+          SetResultText(err.str());
+          SetForegroundWindow(m_hWnd);
+          return;
         }
 
-        void OnSelectedPrepareIntegrityToken(void* ptr) {
-            GameLogging::Info("OnSelectedPrepareIntegrityToken");
+        RemoveKnownPurchase(sPurchaseToken);
+        std::string msg =
+            "Successfully consumed purchase.\r\npurchase_token: " +
+            RedactTokenForLog(sPurchaseToken);
+        GameLogging::Info(msg);
+        SetResultText(msg);
+        SetForegroundWindow(m_hWnd);
+      };
+    });
+  }
+
+  // 9. Prepare Integrity Token
+  void OnClickPrepareIntegrityToken() {
+    if (!mSdkInitialized) {
+      SetResultText(
+          "Error: Run 'Initialize Billing SDK' first to initialize the Play "
+          "PC SDK runtime.");
+      return;
+    }
+    if (!mIntegrityClient) {
+      mIntegrityClient = std::make_shared<IntegrityClient>();
+    }
+    if (manifest.App.cloudProjectNumber <= 0) {
+      SetResultText(
+          "Error: Set a valid <CloudProjectNumber> in manifest.xml before "
+          "calling PrepareIntegrityToken.");
+      return;
+    }
+
+    PrepareIntegrityTokenParams param;
+    param.cloud_project_number = manifest.App.cloudProjectNumber;
+
+    SetResultText("Preparing Play Integrity token...");
+    GameLogging::Info("PrepareIntegrityToken started");
+
+    auto integrityClient = mIntegrityClient;
+    RunAsyncOperation([this, integrityClient, param]() -> std::function<void()> {
+      auto promise =
+          std::make_shared<std::promise<PrepareIntegrityTokenResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
+      integrityClient->PrepareIntegrityToken(
+          param, [promise, settled](PrepareIntegrityTokenResult r) {
+            SetPromiseOnce(promise, settled, std::move(r));
+          });
+      PrepareIntegrityTokenResult res = promise->get_future().get();
+
+      return [this, result = std::move(res)]() {
+        if (!result.ok()) {
+          std::string errMsg = std::format(
+              "PrepareIntegrityToken failed (code {}): {}",
+              static_cast<int>(result.code()), result.error_message());
+          GameLogging::Error(errMsg);
+          SetResultText(errMsg);
+          return;
         }
 
-        void OnSelectedRequestIntegrityToken(void* ptr) {
-            GameLogging::Info("OnSelectedRequestIntegrityToken");
+        mPrepareIntegrityTokenResValue.emplace(result.value());
+        std::string msg =
+            "PrepareIntegrityToken completed successfully.\r\nWarm-up session "
+            "ready.";
+        GameLogging::Info(msg);
+        SetResultText(msg);
+      };
+    });
+  }
+
+  // 10. Request Integrity Token
+  void OnClickRequestIntegrityToken() {
+    if (!mIntegrityClient || !mPrepareIntegrityTokenResValue.has_value()) {
+      SetResultText(
+          "Error: Call 'Prepare Integrity Token' successfully before "
+          "requesting an integrity token.");
+      return;
+    }
+
+    mCachedRequestHash = GenerateIntegrityRequestHash(
+        manifest.App.PackageName, "verify_integrity");
+    RequestIntegrityTokenParams param{
+        mPrepareIntegrityTokenResValue->request_token_data, mCachedRequestHash};
+
+    SetResultText("Requesting Play Integrity token with SHA-256 request_hash...");
+    GameLogging::Info("RequestIntegrityToken started with request_hash=" +
+                      mCachedRequestHash);
+
+    auto integrityClient = mIntegrityClient;
+    RunAsyncOperation([this, integrityClient, param]() -> std::function<void()> {
+      auto promise =
+          std::make_shared<std::promise<RequestIntegrityTokenResult>>();
+      auto settled = std::make_shared<std::atomic_bool>(false);
+      integrityClient->RequestIntegrityToken(
+          param, [promise, settled](RequestIntegrityTokenResult r) {
+            SetPromiseOnce(promise, settled, std::move(r));
+          });
+      RequestIntegrityTokenResult res = promise->get_future().get();
+
+      return [this, result = std::move(res)]() {
+        if (!result.ok()) {
+          std::string errMsg = std::format(
+              "RequestIntegrityToken failed (code {}): {}",
+              static_cast<int>(result.code()), result.error_message());
+          GameLogging::Error(errMsg);
+          SetResultText(errMsg);
+          return;
         }
 
-        void OnSelectedVerifyIntegrityToken(void* ptr) {
-            GameLogging::Info("OnSelectedVerifyIntegrityToken");
-        }
+        mRequestIntegrityTokenResValue.emplace(result.value());
+        std::ostringstream out;
+        out << "RequestIntegrityToken completed successfully.\r\n"
+            << "SHA-256 request_hash: " << mCachedRequestHash << "\r\n"
+            << "Token: "
+            << RedactTokenForLog(mRequestIntegrityTokenResValue->token_bytes);
+        GameLogging::Info(out.str());
+        SetResultText(out.str());
+      };
+    });
+  }
 
-        void OnClickPrepareIntegrityToken(void* ptr) {
-            GameLogging::Info("OnClickPrepareIntegrityToken");
+  // 11. Verify Integrity Token (via api-server)
+  void OnClickVerifyIntegrityToken() {
+    if (!mRequestIntegrityTokenResValue.has_value()) {
+      SetResultText(
+          "Error: Call 'Request Integrity Token' successfully before verifying "
+          "with the backend server.");
+      return;
+    }
 
-            if (mIntegrityClient == nullptr) {
-                initializeIntegrityClient();
+    nlohmann::json jsonPayload;
+    jsonPayload["packageName"] = manifest.App.PackageName;
+    jsonPayload["token"] = mRequestIntegrityTokenResValue->token_bytes;
+    std::string payload = jsonPayload.dump();
+    std::string baseUrl = manifest.App.backendBaseUrl;
+    std::string url = baseUrl + "/api/verifyIntegrityToken";
+    std::string expectedHash = mCachedRequestHash;
+    std::string apiAuthToken = TrimAsciiWhitespace(GetEnvVarString("API_AUTH_TOKEN"));
+    if (apiAuthToken.empty()) {
+      apiAuthToken = manifest.App.apiAuthToken;
+    }
+
+    SetResultText("Verifying integrity token via " + url + "...");
+    GameLogging::Info("POST " + url);
+
+    RunAsyncOperation(
+        [this, baseUrl, payload, expectedHash,
+         apiAuthToken]() -> std::function<void()> {
+          static std::once_flag restClientInitOnce;
+          std::call_once(restClientInitOnce, []() { RestClient::init(); });
+
+          RestClient::Connection conn(baseUrl);
+          conn.AppendHeader("Content-Type", "application/json");
+          if (!apiAuthToken.empty()) {
+            conn.AppendHeader("Authorization", "Bearer " + apiAuthToken);
+          }
+          RestClient::Response response =
+              conn.post("/api/verifyIntegrityToken", payload);
+
+          return [this, response, expectedHash]() {
+            if (response.code == 401) {
+              std::string errMsg =
+                  "Backend HTTP Error: 401 Unauthorized.\r\n"
+                  "Set the API_AUTH_TOKEN environment variable (or "
+                  "<ApiAuthToken> in manifest.local.xml) to a valid Firebase "
+                  "Auth ID token.";
+              GameLogging::Error(errMsg);
+              SetResultText(errMsg);
+              return;
             }
-
-            PrepareIntegrityTokenParams param;
-            param.cloud_project_number = 83701981335; // TODO: Replace with your Google Cloud project number
-
-            std::atomic_bool done = false;
-            PrepareIntegrityTokenResult* resultPtr = nullptr;
-
-            mIntegrityClient->PrepareIntegrityToken(param, [&done, &resultPtr](PrepareIntegrityTokenResult r) {
-                resultPtr = new PrepareIntegrityTokenResult(std::move(r));
-                done = true;
-                });
-
-            while (!done) {
-                Sleep(100);
+            if (response.code != 200) {
+              std::string errMsg =
+                  "Backend HTTP Error: " + std::to_string(response.code);
+              GameLogging::Error(errMsg);
+              SetResultText(errMsg);
+              return;
             }
-
-            if (!resultPtr->ok()) {
-                GameLogging::Error(std::format("PrepareIntegrityToken failed with error code {} and message {}", (int)resultPtr->code(), resultPtr->error_message()));
-                SetWindowText(hResult, L"PrepareIntegrityToken failed");
-            }
-            else {
-                GameLogging::Info("PrepareIntegrityToken completed successfully");
-                if (mPrepareIntegrityTokenResValue) {
-                    delete mPrepareIntegrityTokenResValue;
-                }
-                mPrepareIntegrityTokenResValue = new PrepareIntegrityTokenResultValue(resultPtr->value());
-                SetWindowText(hResult, L"PrepareIntegrityToken completed successfully");
-            }
-            delete resultPtr;
-        }
-
-        void OnClickRequestIntegrityToken(void* ptr) {
-            GameLogging::Info("OnClickRequestIntegrityToken");
-            if (mIntegrityClient == nullptr) {
-                initializeIntegrityClient();
-            }
-            if (mPrepareIntegrityTokenResValue == nullptr) {
-                GameLogging::Error("PrepareIntegrityToken must be called successfully before RequestIntegrityToken");
-                SetWindowText(hResult, L"Error: Call PrepareIntegrityToken first");
-                return;
-            }
-
-            mCachedRequestHash = std::to_string(std::time(nullptr));
-            RequestIntegrityTokenParams param{
-                mPrepareIntegrityTokenResValue->request_token_data,
-                mCachedRequestHash
-            };
-
-            std::atomic_bool done = false;
-            RequestIntegrityTokenResult* resultPtr = nullptr;
-
-            mIntegrityClient->RequestIntegrityToken(param, [&done, &resultPtr](RequestIntegrityTokenResult r) {
-                resultPtr = new RequestIntegrityTokenResult(std::move(r));
-                done = true;
-                });
-
-            while (!done) {
-                Sleep(100);
-            }
-
-            if (!resultPtr->ok()) {
-                GameLogging::Error(std::format("RequestIntegrityToken failed with error code {} and message {}", (int)resultPtr->code(), resultPtr->error_message()));
-                SetWindowText(hResult, L"RequestIntegrityToken failed");
-            }
-            else {
-                GameLogging::Info("RequestIntegrityToken completed successfully");
-                if (mRequestIntegrityTokenResValue) {
-                    delete mRequestIntegrityTokenResValue;
-                }
-                mRequestIntegrityTokenResValue = new RequestIntegrityTokenResultValue(resultPtr->value());
-                SetWindowText(hResult, L"RequestIntegrityToken completed successfully");
-
-                GameLogging::Info("Token snippet: " + mRequestIntegrityTokenResValue->token_bytes.substr(0, 20) + "...");
-            }
-            delete resultPtr;
-        }
-
-        void OnClickVerifyIntegrityToken(void* ptr) {
-            GameLogging::Info("OnClickVerifyIntegrityToken");
-            static bool bAllowUnlicensed = false;
-            bool bContinueExecution = false;
-            if (mRequestIntegrityTokenResValue == nullptr) {
-                GameLogging::Error("RequestIntegrityToken must be called successfully before VerifyIntegrityToken");
-                SetWindowText(hResult, L"Error: Call RequestIntegrityToken first");
-                return;
-            }
-
-            GameLogging::Info("Token to verify: " + mRequestIntegrityTokenResValue->token_bytes);
 
             try {
-                nlohmann::json jsonPayload;
-                jsonPayload["packageName"] = manifest.App.PackageName;
-                jsonPayload["token"] = mRequestIntegrityTokenResValue->token_bytes;
-                std::string payload = jsonPayload.dump();
+              auto resJson = nlohmann::json::parse(response.body);
+              if (!resJson.value("result", false)) {
+                std::string err = resJson.value("error", "Unknown server error");
+                std::string msg = "Verification failed: " + err;
+                GameLogging::Error(msg);
+                SetResultText(msg);
+                return;
+              }
 
-                std::string url = "https://dynasty-teapot-sample.web.app/api/verifyIntegrityToken";
-                std::string content_type = "application/json";
+              std::string receivedHash = resJson.value("hash", "");
+              if (receivedHash != expectedHash) {
+                std::string msg =
+                    "Verification failed: requestHash mismatch!\r\nExpected: " +
+                    expectedHash + "\r\nReceived: " + receivedHash;
+                GameLogging::Error(msg);
+                SetResultText(msg);
+                return;
+              }
 
-                RestClient::Response response = RestClient::post(url, content_type, payload);
+              std::string licensingVerdict = "UNSPECIFIED";
+              if (resJson.contains("payload") &&
+                  resJson["payload"].contains("tokenPayloadExternal") &&
+                  resJson["payload"]["tokenPayloadExternal"].contains(
+                      "accountDetails") &&
+                  resJson["payload"]["tokenPayloadExternal"]["accountDetails"]
+                      .contains("appLicensingVerdict")) {
+                licensingVerdict =
+                    resJson["payload"]["tokenPayloadExternal"]["accountDetails"]
+                           ["appLicensingVerdict"]
+                               .get<std::string>();
+              }
 
-                if (response.code == 200) {
-                    auto resJson = nlohmann::json::parse(response.body);
-                    if (resJson.contains("result") && resJson["result"].get<bool>()) {
-                        std::string receivedHash = resJson.contains("hash") ? resJson["hash"].get<std::string>() : "";
-                        if (receivedHash == mCachedRequestHash) {
-                            GameLogging::Info("Hash matches and PIA returns 200 but we need to check licensing verdict");
-                            std::string licensingVerdict = "";
-                            try {
-                                if (resJson.contains("payload") &&
-                                    resJson["payload"].contains("tokenPayloadExternal") &&
-                                    resJson["payload"]["tokenPayloadExternal"].contains("accountDetails") &&
-                                    resJson["payload"]["tokenPayloadExternal"]["accountDetails"].contains("appLicensingVerdict")) {
-                                    licensingVerdict = resJson["payload"]["tokenPayloadExternal"]["accountDetails"]["appLicensingVerdict"].get<std::string>();
-                                }
-                            }
-                            catch (nlohmann::json::exception& e) {
-                                GameLogging::Error(std::format("Exception parsing licensing verdict: {}", e.what()));
-                            }
-
-                            if (licensingVerdict == "LICENSED") {
-                                GameLogging::Info("Verification successful! Hash matches and licensed.");
-                                SetWindowText(hResult, L"Verification successful! Hash matches and licensed.");
-                                bContinueExecution = true;
-                            }
-                            else if (bAllowUnlicensed) {
-                                GameLogging::Info("Verification successful! Hash matches but unlicensed.");
-                                SetWindowText(hResult, L"Verification successful! Hash matches but unlicensed.");
-                                bContinueExecution = true;
-                            }
-                            else {
-                                GameLogging::Error("Verification failed: Unlicensed! Verdict: " + licensingVerdict);
-                                SetWindowText(hResult, stringToWstring("Verification failed: Unlicensed (" + licensingVerdict + ")").c_str());
-                            }
-                        }
-                        else {
-                            GameLogging::Error("Verification failed: Hash mismatch! Sent: " + mCachedRequestHash + ", Received: " + receivedHash);
-                            SetWindowText(hResult, stringToWstring("Verification failed: Hash mismatch!").c_str());
-                        }
-                    }
-                    else {
-                        std::string error = resJson.contains("error") ? resJson["error"].get<std::string>() : "Unknown error";
-                        GameLogging::Error("Verification failed: " + error);
-                        SetWindowText(hResult, stringToWstring("Verification failed: " + error).c_str());
-                    }
-                }
-                else {
-                    GameLogging::Error("HTTP Error: " + std::to_string(response.code));
-                    SetWindowText(hResult, stringToWstring("HTTP Error: " + std::to_string(response.code)).c_str());
-                }
+              std::ostringstream out;
+              if (licensingVerdict == "LICENSED") {
+                out << "Verification successful!\r\n"
+                    << "Device Verdict: MEETS_PC_INTEGRITY\r\n"
+                    << "Licensing Verdict: LICENSED\r\n"
+                    << "Matched SHA-256 requestHash: " << receivedHash;
+                GameLogging::Info(out.str());
+              } else {
+                out << "Device & requestHash verified, but appLicensingVerdict="
+                    << licensingVerdict;
+                GameLogging::Warning(out.str());
+              }
+              SetResultText(out.str());
+            } catch (const std::exception& ex) {
+              std::string msg = std::string("Failed to parse server JSON: ") +
+                                ex.what();
+              GameLogging::Error(msg);
+              SetResultText(msg);
             }
-            catch (std::exception& e) {
-                GameLogging::Error(std::format("Exception in OnClickVerifyIntegrityToken: {}", e.what()));
-                SetWindowText(hResult, L"Exception during verification");
-            }
+          };
+        });
+  }
+};
 
-            if (!bContinueExecution) {
-                GameLogging::Error("Verification failed: PIA check has failed.");
-                int result = MessageBox(m_hWnd, L"PIA check has failed. Do you want to continue execution?", L"Verification Failed", MB_YESNO | MB_ICONWARNING);
-                if (result == IDNO) {
-                    GameLogging::Error("User chose to terminate execution.");
-                    ExitProcess(1);
-                }
-                else {
-                    GameLogging::Info("User chose to continue execution despite PIA failure.");
-                }
-            }
-        }
+}  // namespace GameApp
 
-    };
-
-}
-
-#endif // !__GAMEAPPBILLINGSDKDIALOG_HPP__
+#endif  // GAME_APP_BILLING_SDK_DIALOG_HPP_

@@ -783,7 +783,6 @@ namespace ndk_helper {
 #include <direct.h>
 
     bool JNIHelper::ReadFile(const char *file_name, std::vector <uint8_t> *buffer_ref) {
-        // TODO(jomof): Why this hardcoded path?
         std::string path = _getcwd(NULL, 0);
         path += "\\";
         path += file_name;

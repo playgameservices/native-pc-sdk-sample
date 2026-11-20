@@ -14,626 +14,325 @@
  *  limitations under the License.
  */
 
-// Initialize the app once before all other includes
-// import { request } from 'express';
-// import { auth } from 'firebase';
 import * as admin from 'firebase-admin';
-admin.initializeApp();
-
-import * as functions from 'firebase-functions';
-import * as purchases from './purchases';
-// import { EXAMPLE_SKUS, IN_APP_COIN_COST, VALID_THEME_NAMES } from './skusValue';
-// import * as usersdb from './usersdb';
-import * as rtdn from './notifications';
-import * as tokensdb from './tokensdb';
-import * as skuDetailsApi from './skuDetailsApi';
-import { topicID, packageName } from './config';
-
-import { HttpsError } from 'firebase-functions/lib/providers/https';
-
-import * as express from 'express';
-// import * as bodyParser from 'body-parser';
 import * as cors from 'cors';
+import * as express from 'express';
+import * as functions from 'firebase-functions/v1';
 
-const app = express();
-app.use(cors({ origin: true }));
+import { allowedOrigins, topicID } from './config';
+import * as rtdn from './notifications';
+import * as playApiClient from './playApiClient';
 
-// Firestore db stuff
-// const SKUS_COLLECTION = 'SKUS';
-// const db = admin.firestore();
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 
-// export interface SkuInfo {
-//   type: string;
-//   sku: string;
-// }
+export interface RequestWithUser extends express.Request {
+  user?: admin.auth.DecodedIdToken;
+}
 
-// interface RequestWithUser extends functions.Request {
-//   user?: admin.auth.DecodedIdToken;
-// }
+export type IdTokenVerifier = (token: string) => Promise<admin.auth.DecodedIdToken>;
 
-// // Start writing Firebase Functions
-// // https://firebase.google.com/docs/functions/typescript
-//
-// export const helloWorld = functions.https.onRequest((request, response) => {
-//   functions.logger.info("Hello logs!", {structuredData: true});
-//   response.send("Hello from Firebase!");
-// });
-
-/**
- * writeDbTest - An https call function that does something more interesting
- *
- * Receive a message through the request variable and write it into the test
- * database. Return the id of the new db entry via a string response.
- */
-// export const writeDbTest = functions.https.onCall(async (request, context) => {
-//     usersdb.verifyAuth(context);
-//     functions.logger.info("Logging a message to the database!", {structuredData: true});
-//     // Get the message from the request map
-//     const message = request.message;
-//     // Add a new document with an auto-generated id.
-//     const res = await db.collection('test').add({
-//         Message: message,
-//     });
-//     console.log('Added Message with ID: ', res.id); // Firebase log
-//     return "Added Message with ID: " + res.id; // Return message
-//   });
+export interface ApiAppDependencies {
+  corsOrigin?: boolean | string[];
+  verifyIdToken?: IdTokenVerifier;
+  client?: Pick<
+    typeof playApiClient,
+    | 'acknowledgePurchase'
+    | 'consumePurchase'
+    | 'verifyPurchaseToken'
+    | 'verifyIntegrityToken'
+    | 'listPurchases'
+    | 'getSkuDetails'
+  >;
+}
 
 /**
- * userAuth is middleware that validates that the request contains a valid user token, and appends
- * the token to the request.
- * @param {RequestWithUser} req
- * @param {functions.Response} res
- * @param {any} next
+ * Fail-closed Firebase Auth middleware: requires a valid `Authorization: Bearer <Firebase ID token>`
+ * header on every /api/* endpoint.
  */
-// async function appendUser(req: RequestWithUser, res: functions.Response, next: any) {
-//   if (req.headers?.authorization?.startsWith('Bearer ')) {
-//     const bearerToken = req.headers.authorization.split(' ').pop();
-//     functions.logger.warn(req.headers?.authorization.toString());
+export function createVerifyAuthMiddleware(
+  verifyIdToken: IdTokenVerifier = (token) => admin.auth().verifyIdToken(token),
+): express.RequestHandler {
+  return async (
+    req: RequestWithUser,
+    res: express.Response,
+    next: express.NextFunction,
+  ): Promise<void> => {
+    const authHeader = req.headers?.authorization;
+    if (typeof authHeader !== 'string' || !authHeader.startsWith('Bearer ')) {
+      res.status(401).json({
+        result: false,
+        error: 'Unauthorized: missing or malformed Authorization Bearer token.',
+      });
+      return;
+    }
 
-//     try {
-//       const user = await admin.auth().verifyIdToken(bearerToken!);
-//       req.user = user;
-//     } catch (err) {
-//       functions.logger.warn('Could not validate user: ', err);
-//     }
-//   } else {
-//     functions.logger.warn('No bearer token present, cannot determine user');
-//   }
+    const bearerToken = authHeader.slice('Bearer '.length).trim();
+    if (!bearerToken || /\s/.test(bearerToken)) {
+      res.status(401).json({
+        result: false,
+        error: 'Unauthorized: missing or malformed Authorization Bearer token.',
+      });
+      return;
+    }
 
-//   next();
-// }
+    try {
+      req.user = await verifyIdToken(bearerToken);
+      next();
+    } catch (error) {
+      functions.logger.warn(
+        'Rejected unauthenticated API request',
+        playApiClient.sanitizeErrorForLog(error),
+      );
+      res.status(401).json({
+        result: false,
+        error: 'Unauthorized: invalid or expired Firebase ID token.',
+      });
+    }
+  };
+}
 
-// app.use(appendUser);
-// app.use(bodyParser.json());
+function readRequiredString(body: unknown, key: string): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return null;
+  }
+  const value = (body as Record<string, unknown>)[key];
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
-// app.get('/getSkus', async (request: functions.Request, response: functions.Response) => {
-//   functions.logger.info('SKU request came in', { structuredData: true });
-//   const skuDocs = await db.collection(SKUS_COLLECTION).listDocuments();
-//   if (skuDocs.length == 0) {
-//     functions.logger.warn('Zero length SkuDocs found, adding in missing SKUs');
-//     for (const exampleSku of EXAMPLE_SKUS) {
-//       await db
-//         .collection(SKUS_COLLECTION)
-//         .add(exampleSku)
-//         .then((docRef) => {
-//           skuDocs.push(docRef);
-//         })
-//         .catch((error) => {
-//           functions.logger.warn(`Could not add example sku to collection : ${error}`);
-//         });
-//     }
-//   }
-//   const skus: any = [];
-//   for (const skuDoc of skuDocs) {
-//     const sku = await skuDoc.get();
-//     skus.push(sku.data());
-//   }
-//   functions.logger.info(skus.toString());
-//   response.json({ skus: skus });
-// });
+function readOptionalString(
+  body: unknown,
+  keys: string[],
+  defaultValue = '',
+): string | null {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    return defaultValue;
+  }
+  const record = body as Record<string, unknown>;
+  for (const key of keys) {
+    if (Object.prototype.hasOwnProperty.call(record, key)) {
+      const value = record[key];
+      if (value === undefined || value === null) {
+        continue;
+      }
+      if (typeof value !== 'string') {
+        return null;
+      }
+      return value.trim();
+    }
+  }
+  return defaultValue;
+}
 
-app.post(
-  '/acknowledgePurchase',
-  async (request: functions.Request, response: functions.Response) => {
-    functions.logger.info('acknowledgePurchase', request.body);
-    functions.logger.info('body: ' + JSON.stringify(request.body)); // body: {"key1":"value1", "key2":"value2"}
-    const productId = request.body.productId;
-    const token = request.body.token;
-    functions.logger.info('productId: ' + productId);
-    functions.logger.info('token: ' + token);
-    const result = await purchases.acknowledgePurchase(productId, token);
-    functions.logger.info('acknowledge result', result);
-    response.json(result);
-  },
-);
+export function createApiApp(deps: ApiAppDependencies = {}): express.Express {
+  const corsOrigin = deps.corsOrigin !== undefined ? deps.corsOrigin : allowedOrigins;
+  const verifyIdToken =
+    deps.verifyIdToken ?? ((token: string) => admin.auth().verifyIdToken(token));
+  const client = deps.client ?? playApiClient;
 
-app.post('/consumePurchase', async (request: functions.Request, response: functions.Response) => {
-  functions.logger.info('consumePurchase', request.body);
-  functions.logger.info('body: ' + JSON.stringify(request.body)); // body: {"key1":"value1", "key2":"value2"}
-  const productId = request.body.productId;
-  const token = request.body.token;
-  functions.logger.info('productId: ' + productId);
-  functions.logger.info('token: ' + token);
-  const result = await purchases.consumePurchase(productId, token);
-  functions.logger.info('consume result', result);
-  response.json(result);
-});
+  const apiRouter = express.Router();
+  apiRouter.use(cors({ origin: corsOrigin }));
+  apiRouter.use(express.json({ limit: '64kb' }));
+  apiRouter.use(createVerifyAuthMiddleware(verifyIdToken));
 
-app.get(
-  '/verifyPurchaseToken',
-  async (request: functions.Request, response: functions.Response) => {
-    functions.logger.info('verifyPurchaseToken', request.query);
-    const productId = request.query.productId + '';
-    const token = request.query.token + '';
-    const result = await purchases.verifyPurchaseToken(productId, token);
-    functions.logger.info('verify result', result);
-    response.json(result);
-  },
-);
-
-app.post(
-  '/verifyIntegrityToken',
-  async (request: functions.Request, response: functions.Response) => {
-    functions.logger.info('verifyIntegrityToken', request.query);
-    functions.logger.info('body: ' + JSON.stringify(request.body));
-    const token = (request.query.token || request.body.token) + '';
-    const packageNameVal =
-      (request.query.packageName || request.body.packageName || packageName) + '';
-    functions.logger.info('token: ' + token);
-    functions.logger.info('packageName: ' + packageNameVal);
-    const result = await purchases.verifyIntegrityToken(token, packageNameVal);
-    functions.logger.info('verify result', result);
-    response.json(result);
-  },
-);
-
-app.get('/getPurchases', async (request: functions.Request, response: functions.Response) => {
-  functions.logger.info('purchases', { structuredData: true });
-  const userAccessToken = request.query.userAccessToken + '';
-  // const result = purchases.fetchPurchase(sku, userAccessToken);
-  const result = await purchases.listPurchases(userAccessToken);
-  functions.logger.info('purchases result', result);
-  response.json({ purchasesresult: result });
-});
-
-// // Used for testing but not needed.
-// // app.post('/createUser', async (request: RequestWithUser, response: functions.Response) => {
-// //     usersdb.verifyAuth(request);
-// //     usersdb.authenticateUser(request);
-// //     response.json({'status': 'Done'});
-// // });
-
-app.get('/getSkuDetails', async (request: functions.Request, response: functions.Response) => {
-  functions.logger.debug('Get SKU Details');
-  // curl -X GET "https://dynasty-teapot-sample.web.app/api/getSkuDetails?one=hello&two=world"
-  functions.logger.debug('query: ' + JSON.stringify(request.query)); // query: {"one":"hello","two":"world"}
-  functions.logger.debug('params: ' + JSON.stringify(request.params)); // {}
-  functions.logger.debug('body: ' + JSON.stringify(request.body)); // {}
-  const userAccessToken = request.query.userAccessToken + '';
-  const sku = request.query.sku + '';
-  const skutype = request.query.skutype + '';
-  const useripaddress = request.query.useripaddress + '';
-  const languagecode = request.query.languagecode + '';
-  const result = await skuDetailsApi.getSkuDetails(
-    userAccessToken,
-    sku,
-    skutype,
-    useripaddress,
-    languagecode,
-  );
-  response.json({
-    result,
+  /**
+   * POST /api/acknowledgePurchase
+   * Acknowledges a non-consumable in-app purchase token using the server's Service Account.
+   */
+  apiRouter.post('/acknowledgePurchase', async (req: RequestWithUser, res: express.Response) => {
+    const productId = readRequiredString(req.body, 'productId');
+    const token = readRequiredString(req.body, 'token');
+    const requestedPkg = readOptionalString(req.body, ['packageName']);
+    if (!productId || !token || requestedPkg === null) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string fields productId and token.',
+      });
+      return;
+    }
+    const outcome = await client.acknowledgePurchase(productId, token, requestedPkg);
+    res.status(outcome.status).json(outcome.body);
   });
-});
 
-app.post('/postSkuDetails', async (request: functions.Request, response: functions.Response) => {
-  functions.logger.debug('Get SKU Details');
-  // curl -X POST "https://dynasty-teapot-sample.web.app/api/postSkuDetails" -H 'Content-Type: application/json' -d '{"key1":"value1", "key2":"value2"}
-  functions.logger.debug('body: ' + JSON.stringify(request.body)); // body: {"key1":"value1", "key2":"value2"}
-  const userAccessToken = request.body.userAccessToken;
-  // functions.logger.debug('userAccessToken: ' + userAccessToken);
-  const result = await skuDetailsApi.testSkuDetails(userAccessToken, 'iap_dynasty_89');
-  response.json({
-    hello: result,
+  /**
+   * POST /api/consumePurchase
+   * Consumes a repeatable in-app purchase token using the server's Service Account.
+   */
+  apiRouter.post('/consumePurchase', async (req: RequestWithUser, res: express.Response) => {
+    const productId = readRequiredString(req.body, 'productId');
+    const token = readRequiredString(req.body, 'token');
+    const requestedPkg = readOptionalString(req.body, ['packageName']);
+    if (!productId || !token || requestedPkg === null) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string fields productId and token.',
+      });
+      return;
+    }
+    const outcome = await client.consumePurchase(productId, token, requestedPkg);
+    res.status(outcome.status).json(outcome.body);
   });
-});
 
-// app.post('/getUser', async (request: RequestWithUser, response: functions.Response) => {
-//   functions.logger.info('User request came in', { structuredData: true });
-//   usersdb.verifyAuth(request);
-//   const authenticatedUserRef = await usersdb.authenticateUser(request);
+  /**
+   * POST /api/verifyPurchaseToken
+   * Validates a purchase token and returns the authoritative ProductPurchase state from Google Play.
+   */
+  apiRouter.post('/verifyPurchaseToken', async (req: RequestWithUser, res: express.Response) => {
+    const productId = readRequiredString(req.body, 'productId');
+    const token = readRequiredString(req.body, 'token');
+    const requestedPkg = readOptionalString(req.body, ['packageName']);
+    if (!productId || !token || requestedPkg === null) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string fields productId and token.',
+      });
+      return;
+    }
+    const outcome = await client.verifyPurchaseToken(productId, token, requestedPkg);
+    res.status(outcome.status).json(outcome.body);
+  });
 
-//   if (!authenticatedUserRef) {
-//     response.status(403).send({
-//       error: 'user is not found in database',
-//     });
-//     return;
-//   }
+  /**
+   * POST /api/verifyIntegrityToken
+   * Decodes and verifies a PC Play Integrity token (`decodePcIntegrityToken`) and returns
+   * the device verdict, licensing verdict, and matched requestHash.
+   */
+  apiRouter.post('/verifyIntegrityToken', async (req: RequestWithUser, res: express.Response) => {
+    const token = readRequiredString(req.body, 'token');
+    const requestedPkg = readOptionalString(req.body, ['packageName']);
+    if (!token || requestedPkg === null) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string field token.',
+      });
+      return;
+    }
+    const outcome = await client.verifyIntegrityToken(token, requestedPkg);
+    res.status(outcome.status).json(outcome.body);
+  });
 
-//   const userData = await usersdb.getUserData(authenticatedUserRef);
-//   if (userData) {
-//     response.json({
-//       status: 'user info found',
-//       accountName: userData.accountName,
-//       email: userData.email,
-//       photoEntitlements: userData.photoEntitlements,
-//       hasBasicSub: userData.hasBasicSub,
-//       hasPremiumSub: userData.hasPremiumSub,
-//       numCoins: userData.numCoins,
-//       theme: userData.theme,
-//     });
-//     return;
-//   }
+  /**
+   * POST /api/getPurchases
+   * Legacy REST endpoint used by api-client migration reference (POST JSON body to avoid tokens in URLs).
+   */
+  apiRouter.post('/getPurchases', async (req: RequestWithUser, res: express.Response) => {
+    const userAccessToken = readRequiredString(req.body, 'userAccessToken');
+    if (!userAccessToken) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string field userAccessToken.',
+      });
+      return;
+    }
+    const outcome = await client.listPurchases(userAccessToken);
+    res.status(outcome.status).json(outcome.body);
+  });
 
-//   response.json({ error: 'error getting user info.' });
-// });
+  /**
+   * POST /api/getSkuDetails
+   * Legacy REST endpoint used by api-client migration reference (POST JSON body to avoid tokens in URLs).
+   */
+  apiRouter.post('/getSkuDetails', async (req: RequestWithUser, res: express.Response) => {
+    const userAccessToken = readRequiredString(req.body, 'userAccessToken');
+    const sku = readRequiredString(req.body, 'sku');
+    const skuType = readOptionalString(req.body, ['skuType', 'skutype'], 'inapp');
+    const userIpAddress = readOptionalString(req.body, ['userIpAddress', 'useripaddress'], '');
+    const languageCode = readOptionalString(req.body, ['languageCode', 'languagecode'], 'en-US');
 
-// app.post('/setTheme', async (request: RequestWithUser, response: functions.Response) => {
-//   usersdb.verifyAuth(request);
-//   const authenticatedUserRef = await usersdb.authenticateUser(request);
+    if (
+      !userAccessToken ||
+      !sku ||
+      skuType === null ||
+      userIpAddress === null ||
+      languageCode === null
+    ) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include valid string fields userAccessToken and sku.',
+      });
+      return;
+    }
 
-//   if (!authenticatedUserRef) {
-//     response.status(403).send({
-//       error: 'user is not found in database',
-//     });
-//     return;
-//   }
+    const outcome = await client.getSkuDetails(
+      userAccessToken,
+      sku,
+      skuType,
+      userIpAddress,
+      languageCode,
+    );
+    res.status(outcome.status).json(outcome.body);
+  });
 
-//   const numCoins = IN_APP_COIN_COST['theme_change']; // Simulates reading from a database
-//   const themeColor: string = request.body?.color;
+  /**
+   * POST /api/postSkuDetails
+   * Legacy REST helper endpoint preserved for backwards compatibility.
+   */
+  apiRouter.post('/postSkuDetails', async (req: RequestWithUser, res: express.Response) => {
+    const userAccessToken = readRequiredString(req.body, 'userAccessToken');
+    const sku = readRequiredString(req.body, 'sku');
+    if (!userAccessToken || !sku) {
+      res.status(400).json({
+        result: false,
+        error: 'Request body must include string fields userAccessToken and sku.',
+      });
+      return;
+    }
+    const outcome = await client.getSkuDetails(userAccessToken, sku, 'inapp', '', 'en-US');
+    res.status(outcome.status).json(outcome.body);
+  });
 
-//   if (themeColor === undefined || !VALID_THEME_NAMES.includes(themeColor)) {
-//     response.status(400).json({
-//       error: `Color provided : ${themeColor} was not in the list of valid colors ${VALID_THEME_NAMES.toString()}`,
-//     });
-//     return;
-//   }
+  const mainApp = express();
+  mainApp.disable('x-powered-by');
+  mainApp.use('/api', apiRouter);
+  return mainApp;
+}
 
-//   const themeChanged = await purchases.setTheme(authenticatedUserRef, numCoins, themeColor);
-//   if (themeChanged.success) {
-//     response.json({
-//       status: 'theme successfully changed',
-//       new_coin_amt: themeChanged.userCoinValue,
-//     });
-//     return;
-//   }
+export const main = functions.https.onRequest(createApiApp());
 
-//   response.json({ error: 'error changing theme.' });
-// });
-
-// app.post('/addCoins', async (request: RequestWithUser, response: functions.Response) => {
-//   functions.logger.info('Add coins request came in', { structuredData: true });
-//   usersdb.verifyAuth(request);
-//   const authenticatedUserRef = await usersdb.authenticateUser(request);
-
-//   if (!authenticatedUserRef) {
-//     response.status(403).send({
-//       error: 'user is not found in database',
-//     });
-//     return;
-//   }
-
-//   // Get parameters passed to the request
-//   const sku: string = request.body?.sku;
-//   const purchaseToken: string = request.body?.token;
-
-//   if (sku === undefined || purchaseToken === undefined) {
-//     console.error(`Either sku (${sku}) or purchaseToken (${purchaseToken}) is undefined`);
-//     response.status(400).json({
-//       error: `Incorrect propery values sent : Either sku (${sku}) or purchaseToken (${purchaseToken}) is undefined`,
-//     });
-//     return;
-//   }
-
-//   functions.logger.info(`${sku} with ${purchaseToken} is received to add coins for user`);
-
-//   // Make sure token is in valid purchase state
-//   const purchase = await purchases.fetchPurchase(sku, purchaseToken);
-//   if (!purchase || !purchase.wasPurchased()) {
-//     console.error('Cannot determine if purchase is valid');
-//     response.status(503).json({ error: 'Error adding coins. Purchase not verified' });
-//     return;
-//   }
-
-//   // Add the items to the user account
-//   const addedCoins = await purchases.addCoins(authenticatedUserRef, purchase);
-//   if (!addedCoins) {
-//     response.status(503).json({ error: 'error granting coins entitlement.' });
-//     return;
-//   }
-//   // If purchase has not been acknowledged, acknowledge it
-//   if (!purchase.wasAcknowledged()) {
-//     const purchaseAcknowledged = await purchases.acknowledgeInAppPurchase(sku, purchaseToken);
-//     if (purchaseAcknowledged) {
-//       response.json({ status: 'Purchase verified and coins granted.' });
-//       return;
-//     }
-//     response.json({ error: 'Error acknowledging purchase' });
-//     return;
-//   }
-
-//   response.json({ status: 'Purchase was already acknowledged' });
-// });
-
-// app.post('/addPhoto', async (request: RequestWithUser, response: functions.Response) => {
-//   functions.logger.info('Add photo request came in', { structuredData: true });
-//   usersdb.verifyAuth(request);
-//   const authenticatedUserRef = await usersdb.authenticateUser(request);
-
-//   if (!authenticatedUserRef) {
-//     response.status(403).send({
-//       error: 'user is not found in database',
-//     });
-//     return;
-//   }
-
-//   // Get parameters passed to the request
-//   const sku: string = request.body?.sku;
-//   const purchaseToken: string = request.body?.token;
-
-//   if (sku === undefined || purchaseToken === undefined) {
-//     console.error(`Either sku (${sku}) or purchaseToken (${purchaseToken}) is undefined`);
-//     response.status(400).json({
-//       error: `Incorrect propery values sent : Either sku (${sku}) or purchaseToken (${purchaseToken}) is undefined`,
-//     });
-//     return;
-//   }
-
-//   // Make sure token is in valid purchase state
-//   const purchase = await purchases.fetchPurchase(sku, purchaseToken);
-//   if (!purchase || !purchase.wasPurchased()) {
-//     console.error('Cannot determine if purchase is valid');
-//     response.status(503).json({ error: 'Error adding photo. Purchase not verified' });
-//     return;
-//   }
-
-//   // Add photo user account's photo entitlements
-//   const addedPhoto = await purchases.addPhoto(authenticatedUserRef, purchase);
-//   if (!addedPhoto) {
-//     response.status(503).json({ error: 'error granting photo entitlement.' });
-//     return;
-//   }
-//   // If purchase has not been acknowledged, acknowledge it
-//   if (!purchase.wasAcknowledged()) {
-//     const purchaseAcknowledged = await purchases.acknowledgeInAppPurchase(sku, purchaseToken);
-//     if (purchaseAcknowledged) {
-//       response.json({ status: 'Purchase verified and photo added.' });
-//       return;
-//     }
-//     response.json({ error: 'Error acknowledging purchase' });
-//     return;
-//   }
-
-//   response.json({ status: 'Purchase was already acknowledged' });
-// });
-
-// app.post('/removePhoto', async (request: RequestWithUser, response: functions.Response) => {
-//   functions.logger.info('Remove photo request came in', { structuredData: true });
-//   usersdb.verifyAuth(request);
-//   const authenticatedUserRef = await usersdb.authenticateUser(request);
-
-//   if (!authenticatedUserRef) {
-//     response.status(403).send({
-//       error: 'user is not found in database',
-//     });
-//     return;
-//   }
-
-//   // Get parameters passed to the request
-//   const sku: string = request.body?.sku;
-//   const purchaseToken: string = request.body?.token;
-
-//   if (sku === undefined || purchaseToken === undefined) {
-//     console.error(`Either sku (${sku}) or purchaseToken (${purchaseToken}) is undefined`);
-//     response.status(400).json({
-//       error: `Incorrect propery values sent : Either sku (${sku}) or purchaseToken (${purchaseToken}) is undefined`,
-//     });
-//     return;
-//   }
-
-//   // Make sure token is in valid purchase state
-//   const purchase = await purchases.fetchPurchase(sku, purchaseToken);
-//   if (!purchase || !purchase.wasPurchased()) {
-//     console.error('Cannot determine if purchase is valid');
-//     response.status(503).json({ error: 'Error removing photo. Purchase not verified' });
-//     return;
-//   }
-
-//   // Remove user account's photo entitlements
-//   const removedPhoto = await purchases.removePhoto(authenticatedUserRef, purchase);
-//   if (removedPhoto) {
-//     response.json({ status: 'Photo removed.' });
-//     return;
-//   }
-
-//   response.status(503).json({ error: 'error removing entitlement.' });
-// });
-
-// app.post('/setHasSub', async (request: RequestWithUser, response: functions.Response) => {
-//   functions.logger.info('Set hasSub request came in', { structuredData: true });
-//   usersdb.verifyAuth(request);
-//   const authenticatedUserRef = await usersdb.authenticateUser(request);
-
-//   if (!authenticatedUserRef) {
-//     response.status(403).send({
-//       error: 'user is not found in database',
-//     });
-//     return;
-//   }
-
-//   // Get parameters passed to the request
-//   const sku: string = request.body?.sku;
-//   const purchaseToken: string = request.body?.token;
-
-//   // Verify purchase with Play Developer API
-//   const subPurchase = await purchases.fetchSubscriptionPurchase(sku, purchaseToken);
-
-//   if (!subPurchase || !subPurchase.isEntitlementActive()) {
-//     console.error('Cannot determine if subscription purchase is valid');
-//     response.status(503).json({ error: 'Error adding subscription. Purchase not verified' });
-//     return;
-//   }
-
-//   // Add subscription entitlement to user
-//   const setSub = await purchases.setHasSub(authenticatedUserRef, subPurchase, sku, true);
-
-//   if (!setSub) {
-//     response.json({ error: `Error setting hasSub for ${sku}.` });
-//     return;
-//   }
-//   // If purchase has not been acknowledged, acknowledge it
-//   if (!subPurchase.wasAcknowledged()) {
-//     const purchaseAcknowledged = await purchases.acknowledgeSubPurchase(sku, purchaseToken);
-//     if (purchaseAcknowledged) {
-//       response.json({ status: 'Subscription purchase verified and granted.' });
-//       return;
-//     }
-//     response.json({ error: 'Error acknowledging purchase' });
-//     return;
-//   }
-
-//   response.json({ status: 'Sub purchase was already acknowledged' });
-// });
-
-// app.post('/validatePurchase', async (request: functions.Request, response: functions.Response) => {
-//   functions.logger.info('Validate purchase request came in', { structuredData: true });
-//   // Get parameters passed to the request
-//   const sku: string = request.body?.sku;
-//   const purchaseToken: string = request.body?.token;
-
-//   if (sku === undefined || purchaseToken === undefined) {
-//     console.error(`Either sku (${sku}) or purchaseToken (${purchaseToken}) is undefined`);
-//     response.status(400).json({
-//       error: `Incorrect propery values sent : Either sku (${sku}) or purchaseToken (${purchaseToken}) is undefined`,
-//     });
-//     return;
-//   }
-
-//   // Make sure token isn't already in tokens db
-//   if (await tokensdb.exists(purchaseToken)) {
-//     console.error('Purchase token already exists');
-//     response.json({ error: 'Unable to validate purchase because token already exists' });
-//     return;
-//   }
-
-//   // Make sure token is in valid purchase state
-//   const purchase = await purchases.fetchPurchase(sku, purchaseToken);
-//   if (!purchase || !purchase.wasPurchased()) {
-//     console.error('Cannot determine if purchase is valid');
-//     response.status(503).json({ error: 'Purchase not verified' });
-//     return;
-//   }
-
-//   response.json({ status: true });
-// });
-
-// app.post(
-//   '/validateSubPurchase',
-//   async (request: functions.Request, response: functions.Response) => {
-//     functions.logger.info('Validate sub purchase request came in', { structuredData: true });
-//     // Get parameters passed to the request
-//     const sku: string = request.body?.sku;
-//     const purchaseToken: string = request.body?.token;
-
-//     // Make sure token isn't already in tokens db
-//     if (await tokensdb.exists(purchaseToken)) {
-//       console.error('Purchase token already exists');
-//       response.json({
-//         error: 'Unable to validate subscription purchase because token already exists',
-//       });
-//       return;
-//     }
-//     // Verify purchase with Play Developer API
-//     const subPurchase = await purchases.fetchSubscriptionPurchase(sku, purchaseToken);
-//     if (subPurchase?.isEntitlementActive()) {
-//       response.json({ status: true });
-//     } else {
-//       response.json({ error: 'Subscription is not active and is not valid' });
-//     }
-//   },
-// );
-
-const main = express();
-main.use(cors({ origin: true }));
-main.use('/api', app);
-
-exports.main = functions.https.onRequest(main);
-
-export const rtdnListener = functions.pubsub.topic(topicID).onPublish(async (data, context) => {
+/**
+ * Pub/Sub Real-Time Developer Notification (RTDN) listener.
+ */
+export const rtdnListener = functions.pubsub.topic(topicID).onPublish(async (message) => {
   try {
-    // Convert the incoming Realtime Developer notification
-    const developerNotification = <rtdn.DeveloperNotification>data.json;
-    const sku = developerNotification.subscriptionNotification?.subscriptionId;
-    const purchaseToken = developerNotification.subscriptionNotification?.purchaseToken;
-    const notification = developerNotification.subscriptionNotification?.notificationType;
-    // Cannot proceed without this information
-    if (!sku || !purchaseToken || !notification) {
-      throw new HttpsError('internal', 'Invalid subscription.');
+    const notification = message.json as rtdn.DeveloperNotification;
+    const configuredPkg = playApiClient.getConfiguredPackageName();
+    if (!notification?.packageName || notification.packageName !== configuredPkg) {
+      functions.logger.warn('Ignoring RTDN event for unexpected packageName', {
+        receivedPackageName: notification?.packageName ?? '',
+        expectedPackageName: configuredPkg,
+      });
+      return;
     }
-    // Search token database for this token and see which user it is associated with.
-    // Note: new purchases will not be in the token store and will not be processed here
-    const userRef = await tokensdb.getUserRefFromToken(purchaseToken);
-    if (!userRef) {
-      throw new HttpsError('internal', 'User not in database.');
-    }
-    // The RTDN contains the purchaseToken but no other information.
-    // Get the full subscription details via the Play Developer API
-    const subPurchase = await purchases.fetchSubscriptionPurchase(sku, purchaseToken);
-    if (!subPurchase) {
-      throw new HttpsError('internal', 'Error getting subscription details.');
-    }
-    let actionSuccessful = false;
-    // Act upon the incoming notification
-    switch (notification) {
-      // TODO: what needs to be done for the following cases?
-      case rtdn.NotificationType.SUBSCRIPTION_PRICE_CHANGE_CONFIRMED:
-      case rtdn.NotificationType.SUBSCRIPTION_DEFERRED:
-      case rtdn.NotificationType.SUBSCRIPTION_PAUSE_SCHEDULE_CHANGED:
-        break;
-      case rtdn.NotificationType.SUBSCRIPTION_CANCELED:
-        // TODO add FCM to send push message to apps for renewal offer
-        break;
-      // For the following cases, remove entitlement
-      case rtdn.NotificationType.SUBSCRIPTION_ON_HOLD:
-      case rtdn.NotificationType.SUBSCRIPTION_REVOKED:
-      case rtdn.NotificationType.SUBSCRIPTION_EXPIRED:
-      case rtdn.NotificationType.SUBSCRIPTION_PAUSED:
-        actionSuccessful = await purchases.setHasSub(userRef, subPurchase, sku, false);
 
-        // TODO add FCM to send push messages to apps to immediately
-        // block entitlement. For now, rely on apps to poll getEntitlements
-        break;
-      // For the following cases, grant entitlement
-      case rtdn.NotificationType.SUBSCRIPTION_RENEWED:
-      case rtdn.NotificationType.SUBSCRIPTION_PURCHASED:
-        // For basic subscription, add 100 coins to user's account when first
-        // purchased and every time it is renewed.
-        actionSuccessful = await purchases.grantSubBenefits(userRef, sku);
-      // falls through
-      case rtdn.NotificationType.SUBSCRIPTION_RECOVERED:
-      case rtdn.NotificationType.SUBSCRIPTION_RESTARTED:
-        actionSuccessful = await purchases.setHasSub(userRef, subPurchase, sku, true);
-        // TODO add FCM to send push messages to apps to ensure
-        // immediate entitlement. For now, rely on apps to poll getEntitlements
-        break;
-      case rtdn.NotificationType.SUBSCRIPTION_IN_GRACE_PERIOD:
-        // TODO add FCM to tell apps to show warning message to user
-        // to fix their payment method
-        break;
+    const subInfo = notification.subscriptionNotification;
+    if (!subInfo?.subscriptionId || !subInfo?.purchaseToken) {
+      functions.logger.info('Received non-subscription or test RTDN event', {
+        version: notification.version,
+        packageName: notification.packageName,
+        eventTimeMillis: notification.eventTimeMillis,
+        hasTestNotification: Boolean(notification.testNotification),
+      });
+      return;
     }
-    if (actionSuccessful) {
-      console.log(
-        'Adjusted entitlement for ' + sku + ' to RTDN: ' + rtdn.NotificationType[notification],
-      );
-    } else {
-      console.log(
-        'Failed to adjust entitlement for ' +
-          sku +
-          ' to RTDN: ' +
-          rtdn.NotificationType[notification],
-      );
-    }
+
+    const subPurchase = await playApiClient.fetchSubscriptionPurchase(
+      subInfo.subscriptionId,
+      subInfo.purchaseToken,
+    );
+    functions.logger.info('Verified RTDN subscription state', {
+      subscriptionId: subInfo.subscriptionId,
+      notificationType: rtdn.NotificationType[subInfo.notificationType],
+      entitlementActive: subPurchase?.isEntitlementActive() ?? false,
+    });
   } catch (error) {
-    console.error(error);
+    functions.logger.error(
+      'Error processing RTDN Pub/Sub message',
+      playApiClient.sanitizeErrorForLog(error),
+    );
   }
 });

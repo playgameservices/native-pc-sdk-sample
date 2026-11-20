@@ -1,75 +1,76 @@
-﻿# Teapot Sample
+﻿# Native C++ PC SDK Sample (`sdk-client`)
 
-This project demonstrates the use of [Google Play Games for PC Native SDK](https://developer.android.com/games/playgames/native-pc/) to [seamlessly sign-in](https://developer.android.com/games/playgames/native-pc/pgs) and [sell digital content](https://developer.android.com/games/playgames/native-pc/billing).
+This project demonstrates how to integrate the **[Google Play Games on PC Native C++ SDK (`26.9.261.0+`)](https://developer.android.com/games/playgames/native-pc/)** into a native Windows C++ game, covering:
+- **SDK Initialization** (`GooglePlayInitialize` + `BillingClient` + `IntegrityClient`)
+- **Play Billing**:
+  1. `Initialize Billing SDK`
+  2. `Query Product Details` (`QueryProductDetails`, supporting comma-separated multi-SKU dropdowns and `full_price_micros` strike-through offers)
+  3. `IsBillingProgramAvailable`
+  4. `CreateBillingProgramReportingDetails` (`external_transaction_token`)
+  5. `Launch Purchase Flow` (`LaunchPurchaseFlow`, handling `PURCHASED` vs `PENDING`)
+  6. `Query Purchases` (`QueryPurchases` for startup/foreground purchase restoration)
+  7. `Acknowledge Purchase` (`AcknowledgePurchase`)
+  8. `Consume Purchase` (`ConsumePurchase`)
+- **Play Integrity**:
+  9. `Prepare Integrity Token` (`PrepareIntegrityToken`)
+  10. `Request Integrity Token` (`RequestIntegrityToken` with Windows CNG SHA-256 `request_hash`)
+  11. `Verify Integrity Token` (Server-side verification via [`api-server`](../api-server))
 
-## Windows Setup
+> **Migrating from Legacy REST APIs?** Compare this project with [`api-client/`](../api-client/) and see the side-by-side migration mapping in [`docs/DESIGN.md`](../docs/DESIGN.md#3-migration-mapping-api-client-legacy-rest-rightarrow-sdk-client-c--sdk-client-unity-c). Notice that **no OAuth2 `client_id` / `client_secret` or local HTTP callback listener is used** in `sdk-client`—authentication is handled automatically by the local Google Play Games on PC client runtime.
 
-In order to build run this sample on Windows you will need to fulfil 3P dependencies.
+---
 
-One way to get these is to use [vcpkg](https://vcpkg.io/en/getting-started.html):
+## Prerequisites & Windows Setup
 
-```
-vcpkg install
-```
+1. **Install Third-Party C++ Libraries via [vcpkg](https://vcpkg.io/en/getting-started.html)**:
+   Run inside `sdk-client/` (creates `sdk-client/vcpkg_installed/` for both `Debug` and `Release` builds):
+   ```powershell
+   vcpkg install
+   ```
 
-You will also need the [play_pc_sdk](https://developer.android.com/games/playgames/native-pc/downloads/cpp) in the solution folder.
+2. **Download the Google Play Games PC SDK (`26.9.261.0` or newer)**:
+   - Download the C++ SDK archive from [Play Games PC SDK Downloads](https://developer.android.com/games/playgames/native-pc/downloads).
+   - Extract it into `sdk-client/play_pc_sdk/` (using the version-independent folder name `play_pc_sdk` so `play_pc_sdk/includes/` and `play_pc_sdk/imports/` exist next to `Teapot.sln`).
 
-```
-unzip play_pc_sdk.zip in the solution folder
-```
+3. **Install [Google Play Games on PC](https://play.google.com/googleplaygames)** and sign in with a license-tester Google Account.
+   - **Local Developer Mode (64-Bit Registry Check)**: When launching an unsigned Visual Studio build directly outside the Google Play Games client, ensure your `EarlyAccessPartnerGuid` (if enrolled in local developer mode) is present in the **64-bit** Windows Registry view:
+     ```powershell
+     reg query "HKLM\Software\Google\Play Games Services" /v EarlyAccessPartnerGuid /reg:64
+     ```
+     *(64-bit `GooglePlayGamesServices.exe` ignores `HKLM\SOFTWARE\WOW6432Node\Google\Play Games Services`. Restart the `GooglePlayGamesServices-<version>` Windows service after updating the registry.)*
 
-Of course, install [Google Play Games for PC client application](https://play.google.com/googleplaygames).
+4. **Create Gitignored `GameApplication/manifest.local.xml`** *(Recommended — keeps tracked [`GameApplication/manifest.xml`](GameApplication/manifest.xml) clean)*:
+   ```xml
+   <?xml version="1.0" encoding="utf-8"?>
+   <Manifest version="1">
+     <Application>
+       <PackageName>com.example.yourgame</PackageName>
+       <IsDeveloperMode>true</IsDeveloperMode>
+       <SKU>your_consumable_sku,your_non_consumable_sku</SKU>
+       <CloudProjectNumber>123456789012</CloudProjectNumber>
+       <BackendBaseUrl>https://your-project.web.app</BackendBaseUrl>
+     </Application>
+   </Manifest>
+   ```
+   - **Automatic Build Output Copy**: On build, MSBuild (`CopyLocalManifestOverride`) automatically copies `manifest.local.xml` to `$(OutDir)manifest.xml` next to `GameApplication.exe` (required by `GooglePlayGamesServices.exe` caller-identity verification).
+   - **Multi-SKU Support**: Separate multiple active In-App Product IDs with commas in `<SKU>` to populate all of them into the `Query Product Details` SKU dropdown (e.g., one consumable SKU for `Consume Purchase` and one single-quantity SKU for `Acknowledge Purchase`).
+   - **Play Integrity Project Alignment**: `<CloudProjectNumber>` **must** match the numeric Google Cloud project number of the Service Account configured in [`api-server`](../api-server) (`SA_EMAIL`), as Play Integrity encrypts tokens specifically for that Cloud project.
+   - **Backend Bearer Authentication (`API_AUTH_TOKEN`)**: Because [`api-server`](../api-server) requires a Firebase Auth ID token on `/api/verifyIntegrityToken`, set the `API_AUTH_TOKEN` environment variable (preferred) or add `<ApiAuthToken>` in gitignored `manifest.local.xml` before running step 11 (`Verify Integrity Token`).
 
-## Play Console Setup
+---
 
-You will need to setup billing from your [Play Console Application](https://developer.android.com/distribute/console) and [Create in-app products](https://developer.android.com/guide/playpoints/create-products) for purchase in this sample.
+## Building and Running
 
-## Building the application
-
-* Open [Teapot.sln](Teapot.sln) file using any recent version of Microsoft Visual Studio.
-
-* Open [AppConfig.json](GameApplication/AppConfig.json) and replace the same _client_id_ and _client_secret_ with your Google API client-id and secret.
-
-* Press F5 to build and run your application.
-
-## Running the application
-
-* Once the application is running correctly, you will be greeted by an OpenGL [scene](/docs/screenshots/sdk-client/00.png) with a teapot and "Billing SDK" button.
-
-![Teapot Scene](/docs/screenshots/sdk-client/00.png?raw=true "Teapot Scene")
-
-* Click on the "Billing SDK" button and a [debug panel](/docs/screenshots/sdk-client/01.png) will pop up. Using this panel, you will be able to see a list of the operations you can perform, the [SDK interfaces](https://developer.android.com/games/playgames/native-pc/reference) and parameters that will be sent to the server as well as the result once you execute the SDK function.
-
-![Debug Panel](/docs/screenshots/sdk-client/01.png?raw=true "Debug Panel")
-
-* In the *Select the operation* menu, click on the first menu item "Initialize Billing SDK". The parameters will automatically change to reflect the parameters that will be passed when you click on the *Run* button.
-
-* Click on the *Run* button and upon the initialization function call return, the result will be updated in the *Result* area. Once the initialization is completed successfully, you will be able to call the rest of the functions in the SDK.
-
-* There are steps that you need to adhere to such as checking for purchases completed outside of your app whenever your application re-enters background. For the most updated list of requirements, checkout the [documentation](https://developer.android.com/games/playgames/native-pc/billing).
-
-![Initialization and Result](/docs/screenshots/sdk-client/02.png?raw=true "Initialization and Result")
-
-* To get the list of products users can purchase and the localized information that can be used to be displayed to the user, you can issue call to [QueryProductDetails](https://developer.android.com/games/playgames/native-pc/reference/class/google/play/billing/billing-client#queryproductdetails).
-
-![Query Product Details](/docs/screenshots/sdk-client/03.png?raw=true "Query Product Details")
-
-* Once the user select a product and decide to purchase, you need to call [LaunchPurchaseFlow](https://developer.android.com/games/playgames/native-pc/reference/class/google/play/billing/billing-client#launchpurchaseflow) to start the purchase flow process.
-
-![Launch Purchase Flow](/docs/screenshots/sdk-client/04.png?raw=true "Launch Purchase Flow")
-
-* The user may be directed to external browser application to complete the purchase.
-
-![User Default Browser Application](/docs/screenshots/sdk-client/05.png?raw=true "User Default Browser Application")
-
-* The entire process will be completed safely, including adding/choosing payment method, fraud prevention, etc. Once the purchase flow is completed, your application can check the [LaunchPurchaseFlowResult](https://developer.android.com/games/playgames/native-pc/reference/class/google/play/result) and retrieve [LaunchPurchaseFlowResultValue](https://developer.android.com/games/playgames/native-pc/reference/struct/google/play/billing/launch-purchase-flow-result-value#structgoogle_1_1play_1_1billing_1_1_launch_purchase_flow_result_value).
-
-![Purchase Completed](/docs/screenshots/sdk-client/06.png?raw=true "Purchase Completed")
-
-* Acknowledge the purchased item by calling [AcknowledgePurchase](https://developer.android.com/games/playgames/native-pc/reference/class/google/play/billing/billing-client#acknowledgepurchase).
-
-![Acknowledge Purchase](/docs/screenshots/sdk-client/07.png?raw=true "Acknowledge Purchase")
-
-* Consume the purchased item by calling [ConsumePurchase](https://developer.android.com/games/playgames/native-pc/reference/class/google/play/billing/billing-client#consumepurchase) if you intend to let the user purchase the same product again.
-
-![Consume Purchase](/docs/screenshots/sdk-client/08.png?raw=true "Consume Purchase")
+1. Open [`Teapot.sln`](Teapot.sln) in Microsoft Visual Studio (`Debug|x64` or `Release|x64`).
+2. Press **F5** to build and run (`manifest.xml`, `play_pc_sdk.dll`, and matching `Debug`/`Release` `vcpkg` DLLs are automatically copied next to `GameApplication.exe`).
+3. On the OpenGL Teapot window, click **Billing SDK** to open the interactive SDK panel:
+   ![Teapot Scene](/docs/screenshots/sdk-client/00.png?raw=true "Teapot Scene")
+   ![Debug Panel](/docs/screenshots/sdk-client/01.png?raw=true "Debug Panel")
+4. Run the operations in sequence:
+   1. **Initialize Billing SDK** — Connects to the Google Play Games runtime and creates `BillingClient` and `IntegrityClient`. (If launched outside Google Play Games without developer mode, `kActionRequiredShutdownClientProcess` cleanly exits so Google Play Games can relaunch the game.)
+   2. **Query Product Details** — Queries localized pricing and offer tokens for the selected SKU in `<SKU>`.
+   3. **IsBillingProgramAvailable** / **CreateBillingProgramReportingDetails** — Checks alternative billing program eligibility and retrieves `external_transaction_token`.
+   4. **Launch Purchase Flow** — Opens the Google Play purchase overlay without blocking the Win32 UI thread *(note: Developer Mode test purchases auto-refund after ~3 minutes if not acknowledged/consumed)*.
+   5. **Query Purchases** — Restores existing unacknowledged/unconsumed purchases and populates them into the Acknowledge/Consume selectors.
+   6. **Acknowledge Purchase** / **Consume Purchase** — Acknowledges non-consumable entitlements or consumes repeatable items.
+   7. **Prepare / Request / Verify Integrity Token** — Warms up Play Integrity (`<CloudProjectNumber>`), generates a cryptographic SHA-256 `request_hash`, requests a PC integrity token, and verifies the verdict via `api-server`.

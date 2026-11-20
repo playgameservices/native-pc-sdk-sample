@@ -2,8 +2,10 @@
 **/*.js
 **/*.js.map
 
-# Except the ESLint config file
+# Except the ESLint config file and Node test files
 !.eslintrc.js
+!test/
+!test/*.test.js
 
 # TypeScript v1 declaration files
 typings/

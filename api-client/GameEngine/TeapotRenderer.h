@@ -80,12 +80,12 @@ struct TEAPOT_MATERIALS {
 };
 
 class TeapotRenderer {
-    int32_t num_indices_;
-    int32_t num_vertices_;
-    GLuint ibo_;
-    GLuint vbo_;
+    int32_t num_indices_ = 0;
+    int32_t num_vertices_ = 0;
+    GLuint ibo_ = 0;
+    GLuint vbo_ = 0;
 
-    SHADER_PARAMS shader_param_;
+    SHADER_PARAMS shader_param_ = {};
 
     bool LoadShaders(SHADER_PARAMS *params, const char *strVsh,
                      const char *strFsh);
@@ -94,7 +94,7 @@ class TeapotRenderer {
     ndk_helper::Mat4 mat_view_;
     ndk_helper::Mat4 mat_model_;
 
-    ndk_helper::TapCamera *camera_;
+    ndk_helper::TapCamera *camera_ = nullptr;
 
 public:
     TeapotRenderer();

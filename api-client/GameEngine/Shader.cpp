@@ -26,7 +26,6 @@
 
 namespace ndk_helper {
 
-// TODO(jomof) Why this #define?
 #define DEBUG (1)
 
     bool shader::CompileShader(

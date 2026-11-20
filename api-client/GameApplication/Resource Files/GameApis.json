@@ -1,37 +1,36 @@
-﻿[
+[
   {
     "ID": 0,
-    "Method": "Get",
+    "Method": "GET",
     "MethodName": "Google Login",
     "URL": "{authorization_Endpoint}?response_type=code&scope={Scopes}&redirect_uri={redirect_uri}&client_id={client_id}&state={state}&code_challenge={code_challenge}&code_challenge_method=S256",
-    "Parameter": "product",
+    "Parameter": "oauth",
     "Bearer": "token",
-    "PostData": "post_data"
+    "PostData": ""
   },
   {
     "ID": 1,
-    "Method": "GET",
+    "Method": "POST",
     "MethodName": "Get SKUs",
-    "URL": "https://dynasty-teapot-sample.web.app/api/getSkuDetails?userAccessToken={token}&sku={sku1}&skuType={skuTypeName}&productId={productId}&userIpAddress={ipAddress}&languageCode={languageCode}",
+    "URL": "https://your-project.web.app/api/getSkuDetails?userAccessToken={token}&sku={sku1}&skutype={skuTypeName}&productId={productId}&useripaddress={ipAddress}&languagecode={languageCode}",
     "Parameter": "category",
     "Bearer": "token",
     "PostData": ""
   },
-
   {
     "ID": 2,
-    "Method": "GET",
+    "Method": "POST",
     "MethodName": "Get Purchases",
-    "URL": "https://dynasty-teapot-sample.web.app/api/getPurchases?packageName={pName}&userAccessToken={token}",
+    "URL": "https://your-project.web.app/api/getPurchases?packageName={pName}&userAccessToken={token}",
     "Parameter": "category",
     "Bearer": "token",
     "PostData": ""
   },
   {
     "ID": 3,
-    "Method": "GET",
-    "MethodName": "Validate the purchase token",
-    "URL": "https://dynasty-teapot-sample.web.app/api/verifyPurchaseToken?packageName={packageName}&productId={productId}&token={token}",
+    "Method": "POST",
+    "MethodName": "Validate Purchase Token",
+    "URL": "https://your-project.web.app/api/verifyPurchaseToken?packageName={packageName}&productId={productId}&token={token}",
     "Parameter": "category",
     "Bearer": "token",
     "PostData": ""
@@ -39,8 +38,8 @@
   {
     "ID": 4,
     "Method": "POST",
-    "MethodName": "Acknowledge the purchase",
-    "URL": "https://dynasty-teapot-sample.web.app/api/acknowledgePurchase?packageName={packageName}&productId={productId}&token={token}",
+    "MethodName": "Acknowledge Purchase",
+    "URL": "https://your-project.web.app/api/acknowledgePurchase?packageName={packageName}&productId={productId}&token={token}",
     "Parameter": "category",
     "Bearer": "token",
     "PostData": ""
@@ -48,11 +47,19 @@
   {
     "ID": 5,
     "Method": "POST",
-    "MethodName": "Consume purchases",
-    "URL": "https://dynasty-teapot-sample.web.app/api/consumePurchase?packageName={packageName}&productId={productId}&token={token}",
+    "MethodName": "Consume Purchase",
+    "URL": "https://your-project.web.app/api/consumePurchase?packageName={packageName}&productId={productId}&token={token}",
+    "Parameter": "category",
+    "Bearer": "token",
+    "PostData": ""
+  },
+  {
+    "ID": 6,
+    "Method": "POST",
+    "MethodName": "Verify Integrity Token",
+    "URL": "https://your-project.web.app/api/verifyIntegrityToken?packageName={packageName}&token={token}",
     "Parameter": "category",
     "Bearer": "token",
     "PostData": ""
   }
 ]
-    

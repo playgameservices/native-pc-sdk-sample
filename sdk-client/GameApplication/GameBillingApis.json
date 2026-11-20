@@ -1,44 +1,68 @@
 ﻿[
   {
     "ID": 1,
-    "Method": "API",
-    "MethodName": "Inititialize Billing SDK",
-    "URL": "[&init_done, &init_result](InitializeResult r) {\n\tinit_result = std::move(r);\n\tinit_done = true;\n}"
+    "Method": "SDK",
+    "MethodName": "Initialize Billing SDK",
+    "URL": "GooglePlayInitialize(continuation, GooglePlayInitializeParams{.package_name})\nBillingClient(BillingClientParams{.enable_pending_purchases = true})"
   },
   {
     "ID": 2,
-    "Method": "API",
+    "Method": "SDK",
     "MethodName": "Query Product Details",
-    "URL": "QueryProductDetailsParams params: \n\tProductID:{PackageName}\n\t ProductType: {ProdType}"
+    "URL": "BillingClient::QueryProductDetails(QueryProductDetailsParams{.product_ids = {{id, ProductType::kTypeInApp}}}, continuation)"
   },
   {
     "ID": 3,
-    "Method": "API",
+    "Method": "SDK",
     "MethodName": "IsBillingProgramAvailable",
-    "URL": "IsBillingProgramAvailableParams params: \n\tbilling_program:{billingProgram}"
+    "URL": "BillingClient::IsBillingProgramAvailable(IsBillingProgramAvailableParams{.billing_program}, continuation)"
   },
   {
     "ID": 4,
-    "Method": "API",
+    "Method": "SDK",
     "MethodName": "CreateBillingProgramReportingDetails",
-    "URL": "CreateBillingProgramReportingDetailsParams params: \n\tProductID:{PackageName}\n\t ProductType: {ProdType}"
+    "URL": "BillingClient::CreateBillingProgramReportingDetails(CreateBillingProgramReportingDetailsParams{.billing_program}, continuation)"
   },
   {
     "ID": 5,
-    "Method": "API",
+    "Method": "SDK",
     "MethodName": "Launch Purchase Flow",
-    "URL": "Launch Purchase Flow"
+    "URL": "BillingClient::LaunchPurchaseFlow(LaunchPurchaseFlowParams{.offer_token}, continuation)"
   },
   {
     "ID": 6,
-    "Method": "API",
-    "MethodName": "Acknowledge Purchase",
-    "URL": "Acknowledge Purchase"
+    "Method": "SDK",
+    "MethodName": "Query Purchases",
+    "URL": "BillingClient::QueryPurchases(continuation)"
   },
   {
     "ID": 7,
-    "Method": "API",
+    "Method": "SDK",
+    "MethodName": "Acknowledge Purchase",
+    "URL": "BillingClient::AcknowledgePurchase(AcknowledgePurchaseParams{.purchase_token}, continuation)"
+  },
+  {
+    "ID": 8,
+    "Method": "SDK",
     "MethodName": "Consume Purchase",
-    "URL": "Consume Purchase"
+    "URL": "BillingClient::ConsumePurchase(ConsumePurchaseParams{.purchase_token}, continuation)"
+  },
+  {
+    "ID": 9,
+    "Method": "SDK",
+    "MethodName": "Prepare Integrity Token",
+    "URL": "IntegrityClient::PrepareIntegrityToken(PrepareIntegrityTokenParams{.cloud_project_number}, continuation)"
+  },
+  {
+    "ID": 10,
+    "Method": "SDK",
+    "MethodName": "Request Integrity Token",
+    "URL": "IntegrityClient::RequestIntegrityToken(RequestIntegrityTokenParams{.request_token_data, .request_hash}, continuation)"
+  },
+  {
+    "ID": 11,
+    "Method": "HTTPS POST",
+    "MethodName": "Verify Integrity Token",
+    "URL": "{BackendBaseUrl}/api/verifyIntegrityToken"
   }
 ]

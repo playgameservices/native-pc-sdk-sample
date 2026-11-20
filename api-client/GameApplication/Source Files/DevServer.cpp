@@ -1,8 +1,9 @@
 #include "pch.h"
 #include "DevServer.h"
 
+using namespace System::Collections::Specialized;
 using namespace System::Threading::Tasks;
-
+using namespace System::Web;
 using namespace System;
 using namespace System::IO;
 using namespace System::Security::Cryptography;
@@ -11,391 +12,320 @@ using namespace System::Threading;
 using namespace System::Net::Sockets;
 
 namespace GameApplication {
-    using namespace System;
-    using namespace System::Net;
-
-    int HttpListenerThread::GetRandomUnusedPort()
-    {
-        TcpListener^ listener = gcnew TcpListener(IPAddress::Loopback, 0);
-        listener->Start();
-        int port = ((IPEndPoint^)listener->LocalEndpoint)->Port;
-        listener->Stop();
-        return port;
-    }
 
     HttpListenerThread::HttpListenerThread() {
-        mPrefix = String::Format("http://{0}:{1}/", IPAddress::Loopback, GetRandomUnusedPort());
-        mListenerOnThread = gcnew HttpListener();
-        mListenerOnThread->Prefixes->Add(mPrefix);
+        mTcpListener = nullptr;
+        mLock = gcnew Object();
         stopRequested = false;
-        Console::WriteLine("HttpListenerThread prefix: {0}", mPrefix);
+        sharedData = nullptr;
+        mPrefix = "";
+        mPort = 0;
+    }
+
+    void HttpListenerThread::BindLoopback() {
+        Monitor::Enter(mLock);
+        try {
+            if (mTcpListener != nullptr) {
+                try {
+                    mTcpListener->Stop();
+                }
+                catch (Exception^) {
+                }
+                mTcpListener = nullptr;
+            }
+            stopRequested = false;
+            mTcpListener = gcnew TcpListener(IPAddress::Loopback, 0);
+            mTcpListener->Start();
+            mPort = ((IPEndPoint^)mTcpListener->LocalEndpoint)->Port;
+            mPrefix = String::Format("http://127.0.0.1:{0}/", mPort);
+            Console::WriteLine("OAuth loopback listener bound at {0}", mPrefix);
+        }
+        finally {
+            Monitor::Exit(mLock);
+        }
+    }
+
+    bool HttpListenerThread::IsStopRequested() {
+        Monitor::Enter(mLock);
+        try {
+            return stopRequested || mTcpListener == nullptr;
+        }
+        finally {
+            Monitor::Exit(mLock);
+        }
     }
 
     void HttpListenerThread::StartListening() {
         try {
-            mListenerOnThread->Start();
-            Console::WriteLine("HttpListenerThread::StartListening()-Listener started at {0}", mListenerOnThread->Prefixes->ToString());//listener->Prefixes[0]);
-
-            while (!stopRequested) {
-                if (mListenerOnThread->IsListening) {
-                    try {
-                        // Wait for a client request
-                        mContext = mListenerOnThread->GetContext(); // Blocks until a request is received
-                        HandleRequest(mContext);
-                    }
-                    catch (Exception^ ex) {
-                        Console::WriteLine("Error handling request: {0}", ex->Message);
-                    }
-
+            while (!IsStopRequested()) {
+                TcpListener^ listener = nullptr;
+                Monitor::Enter(mLock);
+                try {
+                    listener = mTcpListener;
                 }
-            }
-            Console::WriteLine("Listener stopped.");
-        }
-        catch (Exception^ ex) {
-            Console::WriteLine("Error: {0}", ex->Message);
-        }
-    }
-
-    void HttpListenerThread::Stop() {
-        stopRequested = true;
-    }
-
-    void HttpListenerThread::WriteResponse(HttpListenerResponse^ response, String^ content, int statusCode)
-    {
-        array<Byte>^ buffer = System::Text::Encoding::UTF8->GetBytes(content);
-        response->StatusCode = statusCode;
-        response->ContentLength64 = buffer->Length;
-        response->OutputStream->Write(buffer, 0, buffer->Length);
-        response->OutputStream->Close();
-    }
-
-    String^ HttpListenerThread::PerformCodeExchange(String^ code)
-    {
-        HttpClient^ client = gcnew HttpClient();
-        String^ codeVerifier;
-        // Create a new Dictionary to hold the form data
-        Dictionary<String^, String^>^ formData = gcnew Dictionary<String^, String^>(1);
-        String^ clientID = "<your-client-id>";
-        String^ clientSecret = "<your-client-secret>";
-        // Add the key-value pairs one by one
-        formData->Add("code", code);
-        formData->Add("redirect_uri", mPrefix);
-        formData->Add("client_id", clientID);//sharedData->sdConfig->client_id);
-        formData->Add("code_verifier", codeVerifier);
-        formData->Add("grant_type", "authorization_code");
-        formData->Add("client_secret", clientSecret);//sharedData->sdConfig->client_secret);
-        FormUrlEncodedContent^ content = gcnew FormUrlEncodedContent(formData);
-        HttpResponseMessage^ response = client->PostAsync(sharedData->sdConfig->tokenEndpoint, content)->Result;
-        String^ retToken = response->Content->ReadAsStringAsync()->Result;
-        sharedData->sdApiResponse = retToken;
-
-        return retToken;
-    }
-
-    String^ HttpListenerThread::HttpGetCall(String^ url, bool bearer, bool serviceToken)
-    {
-        HttpResponseMessage^ response = nullptr;
-        try {
-            String^ escapeUrl = Uri::EscapeDataString(url);
-            //Console::WriteLine("Escape URL {0}", escapeUrl);
-            Console::WriteLine("Get url\n url :{0} \naccess token :{1}", url, sharedData->sdServiceAccessToken);
-            cli::array<String^>^ urlparts = url->Split('?');
-            Uri^ uri = gcnew Uri(urlparts[0]);
-            urlparts[1] = "?" + urlparts[1];
-            Console::WriteLine("urlparts: {0}\nparameter:{1}", urlparts[0], urlparts[1]);
-            HttpClient^ client = gcnew HttpClient();
-            client->BaseAddress = uri;
-
-            Task<HttpResponseMessage^>^ responseTask = client->GetAsync(escapeUrl);//"&" + urlparts[1]);
-            responseTask->Wait();
-            response = responseTask->Result;
-            if (response->IsSuccessStatusCode)
-            {
-                Task<String^>^ readTask = response->Content->ReadAsStringAsync();
-                readTask->Wait();
-                Console::WriteLine("Response: {0}", readTask->Result);
-            }
-            else
-            {
-                Console::WriteLine("HTTP Error: {0}", response->StatusCode);
-            }
-        }
-        catch (Exception^ e) {
-            Console::WriteLine("Exception in {0}", e->Message);
-        }
-        return response->ToString();
-    }
-
-    String^ HttpListenerThread::GetSKUsDetails(String^ url, bool bearer)
-    {
-        Console::WriteLine("GetSKUsDetails\nuser url :{0} \naccess token :{1}", url, sharedData->sdServiceAccessToken);
-        HttpClient^ client = gcnew HttpClient();
-        Task<HttpResponseMessage^>^ responseTask = client->GetAsync(url);
-        responseTask->Wait();
-        HttpResponseMessage^ response = responseTask->Result;
-
-        if (response->IsSuccessStatusCode)
-        {
-            Task<String^>^ readTask = response->Content->ReadAsStringAsync();
-            readTask->Wait();
-            String^ res = GetSkuObj(readTask->Result);
-            Console::WriteLine("Response: {0}", res);
-            WriteResponse(mContext->Response, res, 200);
-            System::Diagnostics::Process::Start(res);
-        }
-        else
-        {
-            Console::WriteLine("HTTP Error: {0}", response->StatusCode);
-        }
-        return response->ToString();
-    }
-
-
-    // Callback function to handle the response data
-    size_t HttpListenerThread::WriteCallback(void* contents, size_t size, size_t nmemb, std::string* output) {
-        size_t totalSize = size * nmemb;
-        output->append(static_cast<char*>(contents), totalSize);
-        return totalSize;
-    }
-
-    // Function to perform HTTP GET using libcurl
-    void HttpListenerThread::PerformCurlPurchasesRequest(const std::string& url, const std::string& bearerToken) {
-        
-    }
-
-    String^ HttpListenerThread::GetPurchasesDetails(String^ url, bool bearer)
-    {
-       Console::WriteLine("GetPurchases\nuser url :{0} \naccess token :{1}", url, sharedData->sdServiceAccessToken);
-        HttpClient^ client = gcnew HttpClient();
-       /* client->DefaultRequestHeaders->Authorization = gcnew
-                Headers::AuthenticationHeaderValue("Bearer", sharedData->sdServiceAccessToken);*/
-
-        Task<HttpResponseMessage^>^ responseTask = client->GetAsync(url);
-        responseTask->Wait();
-        HttpResponseMessage^ response = responseTask->Result;
-
-        if (response->IsSuccessStatusCode)
-        {
-            Task<String^>^ readTask = response->Content->ReadAsStringAsync();
-            readTask->Wait();
-            String^ res = GetSkuObj(readTask->Result);
-            Console::WriteLine("Response: {0}", res);
-            WriteResponse(mContext->Response, res, 200);
-            System::Diagnostics::Process::Start(res);
-        }
-        else
-        {
-            Console::WriteLine("HTTP Error: {0}", response->StatusCode);
-        }
-        return response->ToString();
-    }
-
-
-    void HttpListenerThread::HandleRequest(HttpListenerContext^ context) {
-        try
-        {
-            mContext = context;
-            String^ urlPath = mContext->Request->Url->AbsolutePath;
-            if (mContext->Request->Url->PathAndQuery->Contains("&code="))
-            {
-                String^ receivedCode = mContext->Request->QueryString->Get("code");
-                String^ receivedState = mContext->Request->QueryString->Get("state");
-                if (receivedState != sharedData->mState)
-                {
-                    WriteResponse(mContext->Response, "Mock Token error", 200);
+                finally {
+                    Monitor::Exit(mLock);
                 }
-
-                String^ token = PerformCodeExchange(receivedCode);
-
-                WriteResponse(mContext->Response, token, 200);
-            }
-            else if (mContext->Request->Url->PathAndQuery->Contains("getsku"))
-            {
-                Dictionary<String^, String^>^ parameterList = ParseQueryParameters(mContext->Request->Url->ToString());
-                String^ tarUrl;
-                String^ bearerToken;
-                parameterList->TryGetValue("url", tarUrl);
-                parameterList->TryGetValue("bearerToken", bearerToken);
-                String^ sdkResult = GetSKUsDetails(tarUrl,bearerToken=="True");
-                //String^ sdkResult = HttpGetCall(tarUrl, bearerToken == "True",true);
-                WriteResponse(context->Response, sdkResult, 200);
-            }
-            else if (urlPath->Equals("/getpurchases", StringComparison::OrdinalIgnoreCase))
-            {
-                Dictionary<String^, String^>^ parameterList = ParseQueryParameters(mContext->Request->Url->ToString());
-                String^ tarUrl;
-                String^ bearerToken;
-                parameterList->TryGetValue("url", tarUrl);
-                parameterList->TryGetValue("bearerToken", bearerToken);
-                String^ purchasesResult = GetPurchasesDetails(tarUrl, bearerToken == "True");
-                WriteResponse(context->Response, purchasesResult, 200);
-            }
-            else if (urlPath->Equals("/", StringComparison::OrdinalIgnoreCase))
-            {
-                WriteResponse(context->Response, ReadFile("index.htm"), 200);
-            }
-            else
-            {
-                WriteResponse(context->Response, "Invalid endpoint.", 404);
-            }
-        }
-        catch (Exception^ ex)
-        {
-            Console::WriteLine("Request Handling Error: {0}", ex->Message);
-            WriteResponse(context->Response, "Internal Server Error", 500);
-        }
-    }
-    
-    DevServer::DevServer(SharedData^ sd)
-    {
-        prefix = String::Format("http://{0}:{1}/", IPAddress::Loopback, GetRandomUnusedPort());
-        Console::Write("Address {0}", prefix);
-        sharedData = sd;
-        sharedData->sdLocalhostAddress = prefix;
-        mlistener = gcnew HttpListener();
-        mlistener->Prefixes->Add(prefix);
-        DevThreadStart();
-        //Start();
-    }
-    DevServer::~DevServer() 
-    {
-        DevThreadStop();
-    }
-	void DevServer::RunServer()
-	{
-        mlistener->Start();
-	}
-
-    void DevServer::DevThreadStop()
-    {
-        mlistener->Stop();
-        if (devThread != nullptr && devThread->IsAlive)
-        {
-            devThread->Join();
-        }
-    }
-
-    void DevServer::DevThreadStart() {
-        devThread = gcnew Thread(gcnew ThreadStart(this, &DevServer::Start));//RunServer));
-        devThread->IsBackground = true;
-        devThread->Start();
-        Console::WriteLine("Server running in a worker thread.");
-    }
-
-    void DevServer::UpdateSharedData(SharedData^ data)
-    {
-        Monitor::Enter(lockObject);
-        try
-        {
-            sharedData = data;
-            Console::WriteLine("Shared data updated: {0}", sharedData);
-        }
-        finally
-        {
-            Monitor::Exit(lockObject);
-        }
-    }
-
-    //Listener functions
-    int DevServer::GetRandomUnusedPort()
-    {
-        TcpListener^ listener = gcnew TcpListener(IPAddress::Loopback, 0);
-        listener->Start();
-
-        int port = ((IPEndPoint^)listener->LocalEndpoint)->Port;
-
-        listener->Stop();
-        return port;
-    }
-
-    void DevServer::WriteResponse(HttpListenerResponse^ response, String^ content, int statusCode)
-    {
-        array<Byte>^ buffer = System::Text::Encoding::UTF8->GetBytes(content);
-        response->StatusCode = statusCode;
-        response->ContentLength64 = buffer->Length;
-        response->OutputStream->Write(buffer, 0, buffer->Length);
-        response->OutputStream->Close();
-    }
-    void DevServer::Start()
-    {
-        try
-        {
-            mlistener->Start();
-            Console::WriteLine("DevServer::Start()-  mlistener->Prefixes->ToString(): {0}", mlistener->Prefixes->ToString());
-            Console::WriteLine("DevServer::Start()- Server started. Listening at {0}", prefix);
-           // return;
-            while (!stopRequested)
-            {
-                if (!mlistener->IsListening)
+                if (listener == nullptr) {
                     break;
-                //IAsyncResult^ contextResult = mlistener->BeginGetContext(nullptr, nullptr);
-                IAsyncResult^ contextResult = mlistener->BeginGetContext(nullptr, sharedData->mState);
-                if (contextResult->AsyncWaitHandle->WaitOne(100))
-                {
-                    // Process the request
-                    mContext = mlistener->EndGetContext(contextResult);
-                    mRequest = mContext->Request;
-                    mResponse = mContext->Response;
-
-                    // Write a response
-                    String^ responseString = "Hello from C++/CLI HttpListener!";
-                    array<Byte>^ buffer = System::Text::Encoding::UTF8->GetBytes(responseString);
-                    mResponse->ContentLength64 = buffer->Length;
-                    mResponse->OutputStream->Write(buffer, 0, buffer->Length);
-                    mResponse->OutputStream->Close();
-                    Console::WriteLine("Request handled.");
                 }
-                mContext = mlistener->GetContext();
-                HandleRequest(mContext);
+
+                TcpClient^ client = nullptr;
+                try {
+                    client = listener->AcceptTcpClient();
+                }
+                catch (SocketException^) {
+                    if (IsStopRequested()) {
+                        break;
+                    }
+                    continue;
+                }
+                catch (ObjectDisposedException^) {
+                    break;
+                }
+
+                if (client == nullptr) {
+                    continue;
+                }
+
+                bool completed = false;
+                try {
+                    completed = HandleClient(client);
+                }
+                catch (Exception^ ex) {
+                    Console::WriteLine("Error handling OAuth callback connection: {0}", ex->Message);
+                }
+                finally {
+                    try {
+                        client->Close();
+                    }
+                    catch (Exception^) {
+                    }
+                }
+
+                if (completed) {
+                    break;
+                }
             }
         }
-        catch (Exception^ ex)
-        {
-            Console::WriteLine("Server Error: {0}", ex->Message);
-        }
-        finally
-        {
+        finally {
             Stop();
         }
     }
 
-    void DevServer::Stop()
-    {
-        if (mlistener->IsListening)
-        {
-            mlistener->Stop();
+    void HttpListenerThread::Stop() {
+        Monitor::Enter(mLock);
+        try {
+            stopRequested = true;
+            if (mTcpListener != nullptr) {
+                try {
+                    mTcpListener->Stop();
+                }
+                catch (Exception^) {
+                }
+                mTcpListener = nullptr;
+            }
         }
-        Console::WriteLine("Server stopped.");
+        finally {
+            Monitor::Exit(mLock);
+        }
     }
 
-    void DevServer::HandleRequest(HttpListenerContext^ context)
+    void HttpListenerThread::WriteHttpResponse(
+        NetworkStream^ stream,
+        int statusCode,
+        String^ reasonPhrase,
+        String^ content,
+        String^ contentType)
     {
-        try
-        {
-            String^ urlPath = context->Request->Url->AbsolutePath;
+        array<Byte>^ bodyBytes = Encoding::UTF8->GetBytes(content);
+        String^ header = String::Format(
+            "HTTP/1.1 {0} {1}\r\n"
+            "Content-Type: {2}\r\n"
+            "Content-Length: {3}\r\n"
+            "Cache-Control: no-store\r\n"
+            "Connection: close\r\n\r\n",
+            statusCode, reasonPhrase, contentType, bodyBytes->Length);
+        array<Byte>^ headerBytes = Encoding::ASCII->GetBytes(header);
+        stream->Write(headerBytes, 0, headerBytes->Length);
+        stream->Write(bodyBytes, 0, bodyBytes->Length);
+        stream->Flush();
+    }
 
+    bool HttpListenerThread::FixedTimeEquals(String^ left, String^ right) {
+        if (left == nullptr || right == nullptr) {
+            return false;
+        }
+        array<Byte>^ a = Encoding::UTF8->GetBytes(left);
+        array<Byte>^ b = Encoding::UTF8->GetBytes(right);
+        if (a->Length != b->Length || a->Length == 0) {
+            return false;
+        }
+        int diff = 0;
+        for (int i = 0; i < a->Length; ++i) {
+            diff |= (a[i] ^ b[i]);
+        }
+        return diff == 0;
+    }
 
-            if (urlPath->Equals("/getsku", StringComparison::OrdinalIgnoreCase))
-            {
-                WriteResponse(context->Response, "Mock SKU data", 200);
+    bool HttpListenerThread::HandleClient(TcpClient^ client) {
+        client->ReceiveTimeout = 5000;
+        client->SendTimeout = 5000;
+        NetworkStream^ stream = client->GetStream();
+
+        array<Byte>^ buffer = gcnew array<Byte>(8192);
+        int totalRead = 0;
+        String^ rawRequest = "";
+        while (totalRead < buffer->Length) {
+            int bytesRead = stream->Read(buffer, totalRead, buffer->Length - totalRead);
+            if (bytesRead <= 0) {
+                break;
             }
-            else if (urlPath->Equals("/getpurchases", StringComparison::OrdinalIgnoreCase))
-            {
-                WriteResponse(context->Response, "Mock purchase data", 200);
-            }
-            else if (urlPath->Equals("/", StringComparison::OrdinalIgnoreCase))
-            {
-                WriteResponse(context->Response, ReadFile("index.htm"), 200);
-            }
-            else
-            {
-                WriteResponse(context->Response, "Invalid endpoint.", 404);
+            totalRead += bytesRead;
+            rawRequest = Encoding::ASCII->GetString(buffer, 0, totalRead);
+            if (rawRequest->Contains("\r\n\r\n") || rawRequest->Contains("\n\n")) {
+                break;
             }
         }
-        catch (Exception^ ex)
-        {
-            Console::WriteLine("Request Handling Error: {0}", ex->Message);
-            WriteResponse(context->Response, "Internal Server Error", 500);
+
+        if (String::IsNullOrWhiteSpace(rawRequest)) {
+            WriteHttpResponse(stream, 400, "Bad Request", "Empty request.", "text/plain; charset=utf-8");
+            return false;
+        }
+
+        int lineEnd = rawRequest->IndexOf('\n');
+        String^ requestLine = (lineEnd >= 0) ? rawRequest->Substring(0, lineEnd)->Trim() : rawRequest->Trim();
+        array<String^>^ parts = requestLine->Split(' ');
+        if (parts->Length < 2) {
+            WriteHttpResponse(stream, 400, "Bad Request", "Malformed HTTP request.", "text/plain; charset=utf-8");
+            return false;
+        }
+
+        String^ method = parts[0];
+        String^ target = parts[1];
+        if (!method->Equals("GET", StringComparison::Ordinal)) {
+            WriteHttpResponse(stream, 405, "Method Not Allowed", "Method not allowed.", "text/plain; charset=utf-8");
+            return false;
+        }
+
+        String^ path = target;
+        String^ query = "";
+        int queryIdx = target->IndexOf('?');
+        if (queryIdx >= 0) {
+            path = target->Substring(0, queryIdx);
+            query = target->Substring(queryIdx + 1);
+        }
+
+        if (!path->Equals("/", StringComparison::Ordinal)) {
+            WriteHttpResponse(stream, 404, "Not Found", "Not found.", "text/plain; charset=utf-8");
+            return false;
+        }
+
+        NameValueCollection^ queryParams = HttpUtility::ParseQueryString(query);
+        String^ receivedCode = queryParams->Get("code");
+        String^ receivedState = queryParams->Get("state");
+        if (String::IsNullOrEmpty(receivedCode)) {
+            WriteHttpResponse(stream, 404, "Not Found", "Not found.", "text/plain; charset=utf-8");
+            return false;
+        }
+
+        if (sharedData == nullptr) {
+            WriteHttpResponse(stream, 500, "Internal Server Error", "OAuth state unavailable.", "text/plain; charset=utf-8");
+            return true;
+        }
+
+        String^ verifier = nullptr;
+        bool stateMatches = false;
+        Monitor::Enter(sharedData->syncRoot);
+        try {
+            if (!String::IsNullOrEmpty(sharedData->mState) &&
+                FixedTimeEquals(receivedState, sharedData->mState)) {
+                stateMatches = true;
+                verifier = sharedData->codeVerifier;
+                // Consume state and PKCE verifier immediately (single-use).
+                sharedData->mState = "";
+                sharedData->codeVerifier = "";
+            }
+        }
+        finally {
+            Monitor::Exit(sharedData->syncRoot);
+        }
+
+        if (!stateMatches) {
+            WriteHttpResponse(
+                stream,
+                400,
+                "Bad Request",
+                "OAuth state validation failed.",
+                "text/plain; charset=utf-8");
+            // Keep listening for the legitimate browser redirect.
+            return false;
+        }
+
+        if (String::IsNullOrEmpty(verifier)) {
+            WriteHttpResponse(
+                stream,
+                400,
+                "Bad Request",
+                "Missing PKCE verifier.",
+                "text/plain; charset=utf-8");
+            return true;
+        }
+
+        PerformCodeExchange(receivedCode, verifier);
+        WriteHttpResponse(
+            stream,
+            200,
+            "OK",
+            "<html><body><h3>Authentication complete. You may close this browser tab and return to the sample app.</h3></body></html>",
+            "text/html; charset=utf-8");
+        return true;
+    }
+
+    String^ HttpListenerThread::PerformCodeExchange(String^ code, String^ verifier)
+    {
+        if (String::IsNullOrEmpty(code) || String::IsNullOrEmpty(verifier) ||
+            sharedData == nullptr || sharedData->sdConfig == nullptr) {
+            return "";
+        }
+
+        String^ clientID = sharedData->sdConfig->client_id;
+        String^ tokenEndpoint = sharedData->sdConfig->tokenEndpoint;
+        if (String::IsNullOrEmpty(clientID) || String::IsNullOrEmpty(tokenEndpoint)) {
+            return "";
+        }
+
+        // Load Google Desktop OAuth client_secret exclusively from environment variable
+        // (never stored in tracked config files or compiled into RCDATA).
+        String^ clientSecret = Environment::GetEnvironmentVariable("GOOGLE_OAUTH_CLIENT_SECRET");
+
+        HttpClient^ client = gcnew HttpClient();
+        try {
+            Dictionary<String^, String^>^ formData = gcnew Dictionary<String^, String^>();
+            formData->Add("code", code);
+            formData->Add("redirect_uri", mPrefix);
+            formData->Add("client_id", clientID);
+            formData->Add("code_verifier", verifier);
+            formData->Add("grant_type", "authorization_code");
+            if (!String::IsNullOrEmpty(clientSecret) && clientSecret != "<your-client-secret>") {
+                formData->Add("client_secret", clientSecret);
+            }
+
+            FormUrlEncodedContent^ content = gcnew FormUrlEncodedContent(formData);
+            HttpResponseMessage^ response = client->PostAsync(tokenEndpoint, content)->Result;
+            String^ retToken = response->Content->ReadAsStringAsync()->Result;
+
+            Monitor::Enter(sharedData->syncRoot);
+            try {
+                sharedData->sdApiResponse = retToken;
+            }
+            finally {
+                Monitor::Exit(sharedData->syncRoot);
+            }
+            return retToken;
+        }
+        finally {
+            delete client;
         }
     }
 

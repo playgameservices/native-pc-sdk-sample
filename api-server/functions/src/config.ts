@@ -14,24 +14,39 @@
  *  limitations under the License.
  */
 
-/**
- * This file is so a user can set their desired constants for their account.
- */
+// SECURITY: Never commit real service-account keys to source control.
+// Configure SA_EMAIL, SA_KEY, and PLAY_PACKAGE_NAME via Firebase Functions
+// environment variables / secrets (`firebase functions:secrets:set SA_KEY`).
+export const serviceAccountEmail = process.env.SA_EMAIL ?? '<SERVICE_ACCOUNT_EMAIL>';
+export const serviceAccountPrivateKey = (
+  process.env.SA_KEY ?? '<SERVICE_ACCOUNT_PRIVATE_KEY>'
+).replace(/\\n/g, '\n');
 
-// SECURITY: never commit service-account keys. Load from the Functions
-// runtime environment (set via `firebase functions:secrets:set SA_KEY`).
-export const serviceAccountEmail =
-  process.env.SA_EMAIL ?? '<SERVICE_ACCOUNT_EMAIL>';
-export const serviceAccountPrivateKey =
-  (process.env.SA_KEY ?? '<SERVICE_ACCOUNT_PRIVATE_KEY>').replace(/\\n/g, '\n');
+// Canonical Play Console package name allowed by this backend.
+export const packageName = process.env.PLAY_PACKAGE_NAME ?? 'com.example.yourgame';
 
-// app package name
-export const packageName = 'com.dynasty.pconlygame';
+// Optional comma-separated CORS origins.
+// Defaults to false (CORS disabled) because native Windows C++ / Unity desktop clients do not
+// require browser CORS; set ALLOWED_ORIGINS explicitly if browser origins must be permitted.
+export function parseAllowedOrigins(rawOrigins?: string): boolean | string[] {
+  if (!rawOrigins) {
+    return false;
+  }
+  const origins = rawOrigins
+    .split(',')
+    .map((origin) => origin.trim())
+    .filter((origin) => origin.length > 0);
+  return origins.length > 0 ? origins : false;
+}
 
-// RTDN pub/sub topic ID
-export const topicID = 'teapot-billing';
+export const allowedOrigins: boolean | string[] = parseAllowedOrigins(
+  process.env.ALLOWED_ORIGINS,
+);
 
-// needed scopes
+// Real-Time Developer Notifications (RTDN) Cloud Pub/Sub topic ID.
+export const topicID = process.env.RTDN_TOPIC_ID ?? 'your-rtdn-pubsub-topic';
+
+// Required Google API OAuth2 scopes for purchase and Play Integrity verification.
 export const scopes: string[] = [
   'https://www.googleapis.com/auth/androidpublisher',
   'https://www.googleapis.com/auth/playintegrity',

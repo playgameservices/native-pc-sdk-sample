@@ -1,14 +1,41 @@
+# Visual Studio & C++ build outputs
+/.vs/
+**/.vs/
+**/x64/
+**/Win32/
+**/Debug/
+**/Release/
+**/vcpkg_installed/
+**/packages/
+*.user
+*.suo
+*.VC.db
+*.VC.opendb
 
-/.vs
-/x64
-/GameEngine/x64
-/GameApplication/x64
-/vcpkg_installed
-/packages
-GameApplication/deeplink.html
-GameApplication/output.txt
-*play_pc_sdk*
-*.gradle*
+# Extracted Play Games PC SDK binaries
+play_pc_sdk/
+**/play_pc_sdk/
+play_pc_sdk_*.zip
+play_pc_sdk_*.tgz
 
+# Runtime logs & local tokens
+**/GameLog.txt
+**/GameApplication.log
+**/deeplink.html
+**/output.txt
+**/userToken.json
+
+# Node / Firebase Functions build outputs
+**/node_modules/
+api-server/functions/lib/
+.firebase/
+firebase-debug.log*
+
+# Secrets & local environment overrides
 *.pem
+*.p12
 .env
+.env.*
+.secret.local
+**/manifest.local.xml
+**/AppConfig.local.json
