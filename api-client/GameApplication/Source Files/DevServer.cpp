@@ -72,18 +72,26 @@ namespace GameApplication {
     String^ HttpListenerThread::PerformCodeExchange(String^ code)
     {
         HttpClient^ client = gcnew HttpClient();
-        String^ codeVerifier;
-        // Create a new Dictionary to hold the form data
-        Dictionary<String^, String^>^ formData = gcnew Dictionary<String^, String^>(1);
-        String^ clientID = "<your-client-id>";
-        String^ clientSecret = "<your-client-secret>";
-        // Add the key-value pairs one by one
+        Dictionary<String^, String^>^ formData = gcnew Dictionary<String^, String^>();
+        String^ clientID = (sharedData != nullptr && sharedData->sdConfig != nullptr)
+            ? sharedData->sdConfig->client_id
+            : "";
+        String^ clientSecret = (sharedData != nullptr && sharedData->sdConfig != nullptr)
+            ? sharedData->sdConfig->client_secret
+            : "";
+        String^ verifier = (sharedData != nullptr && !String::IsNullOrEmpty(sharedData->codeVerifier))
+            ? sharedData->codeVerifier
+            : "";
+
         formData->Add("code", code);
         formData->Add("redirect_uri", mPrefix);
-        formData->Add("client_id", clientID);//sharedData->sdConfig->client_id);
-        formData->Add("code_verifier", codeVerifier);
+        formData->Add("client_id", clientID);
+        formData->Add("code_verifier", verifier);
         formData->Add("grant_type", "authorization_code");
-        formData->Add("client_secret", clientSecret);//sharedData->sdConfig->client_secret);
+        if (!String::IsNullOrEmpty(clientSecret) && clientSecret != "<your-client-secret>") {
+            formData->Add("client_secret", clientSecret);
+        }
+
         FormUrlEncodedContent^ content = gcnew FormUrlEncodedContent(formData);
         HttpResponseMessage^ response = client->PostAsync(sharedData->sdConfig->tokenEndpoint, content)->Result;
         String^ retToken = response->Content->ReadAsStringAsync()->Result;
@@ -196,39 +204,21 @@ namespace GameApplication {
         {
             mContext = context;
             String^ urlPath = mContext->Request->Url->AbsolutePath;
-            if (mContext->Request->Url->PathAndQuery->Contains("&code="))
+            String^ receivedCode = mContext->Request->QueryString->Get("code");
+            if (!String::IsNullOrEmpty(receivedCode))
             {
-                String^ receivedCode = mContext->Request->QueryString->Get("code");
                 String^ receivedState = mContext->Request->QueryString->Get("state");
-                if (receivedState != sharedData->mState)
+                if (String::IsNullOrEmpty(receivedState) || receivedState != sharedData->mState)
                 {
-                    WriteResponse(mContext->Response, "Mock Token error", 200);
+                    WriteResponse(mContext->Response, "OAuth state validation failed (CSRF check).", 400);
+                    return;
                 }
 
-                String^ token = PerformCodeExchange(receivedCode);
-
-                WriteResponse(mContext->Response, token, 200);
-            }
-            else if (mContext->Request->Url->PathAndQuery->Contains("getsku"))
-            {
-                Dictionary<String^, String^>^ parameterList = ParseQueryParameters(mContext->Request->Url->ToString());
-                String^ tarUrl;
-                String^ bearerToken;
-                parameterList->TryGetValue("url", tarUrl);
-                parameterList->TryGetValue("bearerToken", bearerToken);
-                String^ sdkResult = GetSKUsDetails(tarUrl,bearerToken=="True");
-                //String^ sdkResult = HttpGetCall(tarUrl, bearerToken == "True",true);
-                WriteResponse(context->Response, sdkResult, 200);
-            }
-            else if (urlPath->Equals("/getpurchases", StringComparison::OrdinalIgnoreCase))
-            {
-                Dictionary<String^, String^>^ parameterList = ParseQueryParameters(mContext->Request->Url->ToString());
-                String^ tarUrl;
-                String^ bearerToken;
-                parameterList->TryGetValue("url", tarUrl);
-                parameterList->TryGetValue("bearerToken", bearerToken);
-                String^ purchasesResult = GetPurchasesDetails(tarUrl, bearerToken == "True");
-                WriteResponse(context->Response, purchasesResult, 200);
+                PerformCodeExchange(receivedCode);
+                WriteResponse(
+                    mContext->Response,
+                    "<html><body><h3>Authentication complete. You may close this browser tab and return to the sample app.</h3></body></html>",
+                    200);
             }
             else if (urlPath->Equals("/", StringComparison::OrdinalIgnoreCase))
             {

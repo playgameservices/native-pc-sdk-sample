@@ -1,8 +1,11 @@
 {
   "hosting": {
-    "site": "dynasty-teapot-sample",
-    "public": "src",
-    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
     "rewrites": [
       {
         "source": "/api/**",
@@ -10,7 +13,15 @@
       }
     ]
   },
-  "functions": {
-    "predeploy": ["npm run lint", "npm --prefix \"$RESOURCE_DIR\" run build"]
-  }
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "runtime": "nodejs22",
+      "predeploy": [
+        "npm --prefix functions run lint",
+        "npm --prefix functions run build"
+      ]
+    }
+  ]
 }

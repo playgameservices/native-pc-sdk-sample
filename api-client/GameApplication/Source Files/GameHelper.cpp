@@ -22,7 +22,6 @@ namespace GameApplication {
         HRSRC hgameXml = FindResource(NULL, MAKEINTRESOURCE(GAME_XML_ID), RT_RCDATA);
         HRSRC hConfigJson = FindResource(NULL, MAKEINTRESOURCE(IDR_JSON2), RT_RCDATA);
         HRSRC hGameJson = FindResource(NULL, MAKEINTRESOURCE(IDR_JSON1), RT_RCDATA);
-        HRSRC hServiceJson = FindResource(NULL, MAKEINTRESOURCE(IDR_JSON3), RT_RCDATA);
         if (!hgameXml) {
             Console::WriteLine("Resource not found!");
         }
@@ -101,9 +100,9 @@ namespace GameApplication {
         Console::WriteLine("Auth::AuthWindow_Load - mState - {0}", appSettingFiles->mState);
         //mRedirectUri = String::Format("http://{0}:{1}/", IPAddress::Loopback->ToString(), 8080);
         mSd = gcnew SharedData();
-        //listenerFuncThread->
         mSd->sdConfig = appSettingFiles->mConfig;
         mSd->mState = appSettingFiles->mState;
+        mSd->codeVerifier = appSettingFiles->codeVerifier;
         listenerFuncThread->sharedData = mSd;
         mSd->sdLocalhostAddress = mRedirectUri;
         LoadWindow(sender, e);
@@ -124,12 +123,17 @@ namespace GameApplication {
 
     void GameApplication::AccessToken() {
         txtResult->Text = "Started Auth";
-        String^ authUrl = BuildAuthorizationUrl(appSettingFiles->mState, codeChallenge);
-        if (txtBuiltUrl->Text != authUrl) {
-            Console::WriteLine("Both are differnt \n{0}\n{1}", txtBuiltUrl->Text, authUrl);
+        appSettingFiles->RegenerateOAuthSecurityParams();
+        if (mSd != nullptr) {
+            mSd->mState = appSettingFiles->mState;
+            mSd->codeVerifier = appSettingFiles->codeVerifier;
         }
-
-        authUrl = txtBuiltUrl->Text;
+        SetValueForKey("redirect_uri", Uri::EscapeDataString(mRedirectUri));
+        SetValueForKey("client_id", Uri::EscapeDataString(appSettingFiles->mConfig->client_id));
+        SetValueForKey("state", Uri::EscapeDataString(appSettingFiles->mState));
+        SetValueForKey("code_challenge", Uri::EscapeDataString(appSettingFiles->codeChallenge));
+        String^ authUrl = BuildAuthorizationUrl(appSettingFiles->mState, appSettingFiles->codeChallenge);
+        txtBuiltUrl->Text = authUrl;
 
         //HttpClient^ client = gcnew HttpClient();
         //Task<HttpResponseMessage^>^ responseTask = client->GetAsync(authUrl);
@@ -143,14 +147,36 @@ namespace GameApplication {
         //}
 
         Console::WriteLine("Auth URL: {0}", authUrl);
-        System::Diagnostics::Process::Start(authUrl);
-        HttpListenerContext^ context = listenerFuncThread->mListenerOnThread->GetContext();
+        Uri^ parsedAuthUri = nullptr;
+        if (!Uri::TryCreate(authUrl, UriKind::Absolute, parsedAuthUri) ||
+            parsedAuthUri->Scheme != Uri::UriSchemeHttps) {
+            txtResult->Text = "Error: Invalid non-HTTPS authorization URL.";
+            return;
+        }
+        mSd->sdApiResponse = "";
+        ProcessStartInfo^ psi = gcnew ProcessStartInfo(parsedAuthUri->AbsoluteUri);
+        psi->UseShellExecute = true;
+        System::Diagnostics::Process::Start(psi);
 
-        mSd->sdResposne = ReadResponse(mSd->sdApiResponse);
-        appSettingFiles->mUserAccessToken = mSd->sdResposne->access_token;
-        txtAccessToken->Text = appSettingFiles->mUserAccessToken;
+        txtResult->Text = "Waiting for OAuth2 callback in browser (up to 60s)...";
+        for (int elapsedMs = 0; elapsedMs < 60000; elapsedMs += 100) {
+            if (!String::IsNullOrEmpty(mSd->sdApiResponse)) {
+                break;
+            }
+            System::Windows::Forms::Application::DoEvents();
+            System::Threading::Thread::Sleep(100);
+        }
 
-        txtResult->Text = mSd->sdApiResponse;
+        if (!String::IsNullOrEmpty(mSd->sdApiResponse)) {
+            mSd->sdResposne = ReadResponse(mSd->sdApiResponse);
+            if (mSd->sdResposne != nullptr && !String::IsNullOrEmpty(mSd->sdResposne->access_token)) {
+                appSettingFiles->mUserAccessToken = mSd->sdResposne->access_token;
+                txtAccessToken->Text = appSettingFiles->mUserAccessToken;
+            }
+            txtResult->Text = mSd->sdApiResponse;
+        } else {
+            txtResult->Text = "Timed out waiting for OAuth sign-in callback.";
+        }
         this->Activate();
         return;
     }
@@ -171,31 +197,25 @@ namespace GameApplication {
 
         switch (lstBoxOperations->SelectedIndex)
         {
-        case HttpOps::GLogin:  //0
-        {
+        case HttpOps::GLogin:               // 0 -> maps to Initialize Billing SDK
             AccessToken();
-        }
-        break;
-        case HttpOps::GetPurchases:
-        {
-            GetPurchasesDetails();
-        }
-        break;
-        case HttpOps::GetSKUs:
-        {
-            GetSkusDetails();
-        }
-        break;
-        case HttpOps::AcknowledgeThePurchase:
-            GetAcknowledgePurchase();
             break;
-        case HttpOps::VerifyThePurchaseToken:
+        case HttpOps::GetSKUs:              // 1 -> maps to QueryProductDetails + LaunchPurchaseFlow
+            GetSkusDetails();
+            break;
+        case HttpOps::GetPurchases:         // 2 -> maps to QueryPurchases
+            GetPurchasesDetails();
+            break;
+        case HttpOps::VerifyThePurchaseToken: // 3 -> Server purchase token verification
             GetValidatePurchase();
             break;
-        case HttpOps::ConsumePurchases:
+        case HttpOps::AcknowledgeThePurchase: // 4 -> maps to AcknowledgePurchase
+            GetAcknowledgePurchase();
+            break;
+        case HttpOps::ConsumePurchases:     // 5 -> maps to ConsumePurchase
             PostConsumePurchase();
             break;
-        case HttpOps::VerifyIntegrityToken:
+        case HttpOps::VerifyIntegrityToken: // 6 -> maps to VerifyIntegrityToken
             PostVerifyIntegrityToken();
             break;
         default:
@@ -206,6 +226,7 @@ namespace GameApplication {
     }
 
     System::Void GameApplication::lstBox_SelectedIndexChanged(System::Object^ sender, System::EventArgs^ e) {
+        if (lstBoxOperations->SelectedIndex < 0) return;
         txtDefaulUrl->Text = "";
         txtResult->Text = "";
         txtBuiltUrl->Text = "";
@@ -220,14 +241,12 @@ namespace GameApplication {
         {
             SetValueForKey("authorization_Endpoint", appSettingFiles->mConfig->authorization_Endpoint);
             SetValueForKey("redirect_uri", Uri::EscapeDataString(mRedirectUri));
-            //SetValueForKey("redirect_uri", "https://dynasty-teapot-sample.web.app/");
-            SetValueForKey("client_id", appSettingFiles->mConfig->client_id);
-            SetValueForKey("state", appSettingFiles->mState);
-            SetValueForKey("code_challenge", "");
+            SetValueForKey("client_id", Uri::EscapeDataString(appSettingFiles->mConfig->client_id));
+            SetValueForKey("state", Uri::EscapeDataString(appSettingFiles->mState));
+            SetValueForKey("code_challenge", Uri::EscapeDataString(appSettingFiles->codeChallenge));
             SetValueForKey("Scopes", appSettingFiles->mConfig->Scopes);
             txtBuiltUrl->Text = UpdateUrl();
         }
-        break;
         break;
         case HttpOps::GetSKUs:	//3
         {
@@ -275,7 +294,7 @@ namespace GameApplication {
         case HttpOps::VerifyIntegrityToken:
         {
             SetValueForKey("packageName", appSettingFiles->mPackageName);
-            SetValueForKey("token", txtAccessToken->Text); // Using txtAccessToken as placeholder
+            SetValueForKey("token", "");
             txtBuiltUrl->Text = UpdateUrl();
         }
         break;
@@ -321,8 +340,13 @@ namespace GameApplication {
         String^ res = GetSkuObj(readData);
         Console::WriteLine("Response: {0}", res);
         txtResult->Text = res;
-        //WriteResponse(mContext->Response, res, 200);
-        System::Diagnostics::Process::Start(res);
+        Uri^ checkoutUri = nullptr;
+        if (Uri::TryCreate(res, UriKind::Absolute, checkoutUri) &&
+            checkoutUri->Scheme == Uri::UriSchemeHttps) {
+            ProcessStartInfo^ psi = gcnew ProcessStartInfo(checkoutUri->AbsoluteUri);
+            psi->UseShellExecute = true;
+            System::Diagnostics::Process::Start(psi);
+        }
     }
 
     /*
@@ -373,7 +397,11 @@ namespace GameApplication {
         if (purchase != nullptr)
         {
             appSettingFiles->mPurchaseToken = purchase->purchaseToken;
-            message = "Purchase Token: " + appSettingFiles->mPurchaseToken;
+            if (!String::IsNullOrEmpty(purchase->productId)) {
+                appSettingFiles->mSku = purchase->productId;
+            }
+            message = String::Format("Product ID: {0}\r\nPurchase Token: {1}",
+                appSettingFiles->mSku, appSettingFiles->mPurchaseToken);
         }
         txtResult->Text = message;
         this->Activate();
@@ -386,34 +414,40 @@ namespace GameApplication {
     {
         String^ url = txtBuiltUrl->Text;
         Console::WriteLine("PostConsumePurchase\nurl :{0} ", url);
-        HttpClient^ client = gcnew HttpClient();
-        String^ message = "";
-        Console::WriteLine("PostValidatePurchase\nurl :{0} ", url);
-        if (appSettingFiles->mPurchaseToken == "") {
-            message = "Error: Purchases Token is not found";
+        String^ tok = SetValueForKey("token");
+        if (String::IsNullOrEmpty(tok)) {
+            tok = appSettingFiles->mPurchaseToken;
+        }
+        String^ prodId = SetValueForKey("productId");
+        if (String::IsNullOrEmpty(prodId)) {
+            prodId = appSettingFiles->mSku;
+        }
+        if (String::IsNullOrEmpty(tok)) {
+            String^ message = "Error: Purchases Token is not found";
             Console::WriteLine(message);
             txtResult->Text = message;
             return;
         }
-        String^ postUrl = url->Substring(0, url->IndexOf("?"));
-        String^ jsonData = Serialize(gcnew RequestData(
-            appSettingFiles->mSku, appSettingFiles->mPurchaseToken));
+        int queryIdx = url->IndexOf("?");
+        String^ postUrl = (queryIdx > 0) ? url->Substring(0, queryIdx) : url;
+        String^ jsonData = Serialize(gcnew RequestData(prodId, tok));
         Console::WriteLine("Request data content: {0}", jsonData);
+        HttpClient^ client = gcnew HttpClient();
         HttpRequestMessage^ requestMessage = gcnew HttpRequestMessage(HttpMethod::Post, postUrl);
         requestMessage->Content = gcnew StringContent(jsonData, Encoding::UTF8, "application/json");
         Task<HttpResponseMessage^>^ responseTask = client->SendAsync(requestMessage);
+        responseTask->Wait();
         HttpResponseMessage^ response = responseTask->Result;
-        String^ responseBody = response->Content->ReadAsStringAsync()->Result;
+        Task<String^>^ readTask = response->Content->ReadAsStringAsync();
+        readTask->Wait();
+        String^ readData = readTask->Result;
 
         if (!response->IsSuccessStatusCode) {
-            String^ errorStatus = String::Format("HTTP Error: {0}", response);
+            String^ errorStatus = String::Format("HTTP Error ({0}): {1}", response->StatusCode, readData);
             txtResult->Text = errorStatus;
             Console::WriteLine(errorStatus);
             return;
         }
-        Task<String^>^ readTask = response->Content->ReadAsStringAsync();
-        readTask->Wait();
-        String^ readData = readTask->Result;
         Console::WriteLine("Return data: {0}", readData);
         txtResult->Text = readData;
     }
@@ -424,33 +458,39 @@ namespace GameApplication {
     void GameApplication::PostValidatePurchase()
     {
         String^ url = txtBuiltUrl->Text;
-        HttpClient^ client = gcnew HttpClient();
-        String^ message = "";
         Console::WriteLine("PostValidatePurchase\nurl :{0} ", url);
-        if (appSettingFiles->mPurchaseToken == "") {
-            message = "Error: Purchases Token is not found";
+        String^ tok = SetValueForKey("token");
+        if (String::IsNullOrEmpty(tok)) {
+            tok = appSettingFiles->mPurchaseToken;
+        }
+        String^ prodId = SetValueForKey("productId");
+        if (String::IsNullOrEmpty(prodId)) {
+            prodId = appSettingFiles->mSku;
+        }
+        if (String::IsNullOrEmpty(tok)) {
+            String^ message = "Error: Purchases Token is not found";
             Console::WriteLine(message);
             txtResult->Text = message;
             return;
         }
-        String^ jsonData = Serialize(gcnew RequestData(
-            appSettingFiles->mSku, appSettingFiles->mPurchaseToken));
+        String^ jsonData = Serialize(gcnew RequestData(prodId, tok));
         Console::WriteLine("Request data content: {0}", jsonData);
+        HttpClient^ client = gcnew HttpClient();
         HttpRequestMessage^ requestMessage = gcnew HttpRequestMessage(HttpMethod::Post, url);
         requestMessage->Content = gcnew StringContent(jsonData, Encoding::UTF8, "application/json");
         Task<HttpResponseMessage^>^ responseTask = client->SendAsync(requestMessage);
+        responseTask->Wait();
         HttpResponseMessage^ response = responseTask->Result;
-        String^ responseBody = response->Content->ReadAsStringAsync()->Result;
+        Task<String^>^ readTask = response->Content->ReadAsStringAsync();
+        readTask->Wait();
+        String^ readData = readTask->Result;
 
         if (!response->IsSuccessStatusCode) {
-            String^ errorStatus = String::Format("HTTP Error: {0}", response);
+            String^ errorStatus = String::Format("HTTP Error ({0}): {1}", response->StatusCode, readData);
             txtResult->Text = errorStatus;
             Console::WriteLine(errorStatus);
             return;
         }
-        Task<String^>^ readTask = response->Content->ReadAsStringAsync();
-        readTask->Wait();
-        String^ readData = readTask->Result;
         Console::WriteLine("Return data: {0}", readData);
         txtResult->Text = readData;
     }
@@ -460,53 +500,36 @@ namespace GameApplication {
     */
     void GameApplication::GetValidatePurchase()
     {
+        String^ tok = SetValueForKey("token");
+        if (String::IsNullOrEmpty(tok)) {
+            tok = appSettingFiles->mPurchaseToken;
+        }
+        if (String::IsNullOrEmpty(tok)) {
+            String^ message = "Error: Purchases Token is not found";
+            Console::WriteLine(message);
+            txtResult->Text = message;
+            return;
+        }
+        txtBuiltUrl->Text = UpdateUrl();
         String^ url = txtBuiltUrl->Text;
         HttpClient^ client = gcnew HttpClient();
 
         Console::WriteLine("GetValidatePurchase\nurl :{0} ", url);
-        if (appSettingFiles->mPurchaseToken == "") {
-            Console::WriteLine("Error: Purchases Token is not found");
-            return;
-        }
-        String^ jsonData = Serialize(gcnew RequestData(
-            appSettingFiles->mSku, appSettingFiles->mPurchaseToken));
-        Console::WriteLine("Request data content: {0}", jsonData);
-        //HttpRequestMessage^ requestMessage = gcnew HttpRequestMessage(HttpMethod::Post, url);
-        //requestMessage->Content = gcnew StringContent(jsonData, Encoding::UTF8, "application/json");
-        //Task<HttpResponseMessage^>^ responseTask = client->SendAsync(requestMessage);
         Task<HttpResponseMessage^>^ responseTask = client->GetAsync(url);
         responseTask->Wait();
         HttpResponseMessage^ response = responseTask->Result;
-        //String^ responseBody = response->Content->ReadAsStringAsync()->Result;
+        Task<String^>^ readTask = response->Content->ReadAsStringAsync();
+        readTask->Wait();
+        String^ readData = readTask->Result;
 
         if (!response->IsSuccessStatusCode) {
-            String^ errorStatus = String::Format("HTTP Error: {0}", response);
+            String^ errorStatus = String::Format("HTTP Error ({0}): {1}", response->StatusCode, readData);
             txtResult->Text = errorStatus;
             Console::WriteLine(errorStatus);
             return;
         }
-        Task<String^>^ readTask = response->Content->ReadAsStringAsync();
-        readTask->Wait();
-        String^ readData = readTask->Result;
         Console::WriteLine("Return data: {0}", readData);
         txtResult->Text = readData;
-        //if (readData->Contains("false")) {
-        //    String^ errorStatus = String::Format("Error data return for API: {0}", readData);
-        //    txtResult->Text = errorStatus;
-        //    Console::WriteLine(errorStatus);
-        //    return;
-        //}
-        //if (!readData->Contains("http")) {
-        //    String^ errorStatus = String::Format("Error data return for API: {0}", readData);
-        //    txtResult->Text = errorStatus;
-        //    Console::WriteLine(errorStatus);
-        //    return;
-        //}
-        //String^ res = GetSkuObj(readData);
-        //Console::WriteLine("Response: {0}", res);
-        //txtResult->Text = res;
-        //WriteResponse(mContext->Response, res, 200);
-        //System::Diagnostics::Process::Start(res);
     }
 
     /*
@@ -516,34 +539,40 @@ namespace GameApplication {
     {
         String^ url = txtBuiltUrl->Text;
         Console::WriteLine("GetAcknowledgePurchase\nurl :{0} ", url);
-        HttpClient^ client = gcnew HttpClient();
-        String^ message = "";
-        Console::WriteLine("PostValidatePurchase\nurl :{0} ", url);
-        if (appSettingFiles->mPurchaseToken == "") {
-            message = "Error: Purchases Token is not found";
+        String^ tok = SetValueForKey("token");
+        if (String::IsNullOrEmpty(tok)) {
+            tok = appSettingFiles->mPurchaseToken;
+        }
+        String^ prodId = SetValueForKey("productId");
+        if (String::IsNullOrEmpty(prodId)) {
+            prodId = appSettingFiles->mSku;
+        }
+        if (String::IsNullOrEmpty(tok)) {
+            String^ message = "Error: Purchases Token is not found";
             Console::WriteLine(message);
             txtResult->Text = message;
             return;
         }
-        String^ postUrl = url->Substring(0, url->IndexOf("?"));
-        String^ jsonData = Serialize(gcnew RequestData(
-            appSettingFiles->mSku, appSettingFiles->mPurchaseToken));
+        int queryIdx = url->IndexOf("?");
+        String^ postUrl = (queryIdx > 0) ? url->Substring(0, queryIdx) : url;
+        String^ jsonData = Serialize(gcnew RequestData(prodId, tok));
         Console::WriteLine("Request data content: {0}", jsonData);
+        HttpClient^ client = gcnew HttpClient();
         HttpRequestMessage^ requestMessage = gcnew HttpRequestMessage(HttpMethod::Post, postUrl);
         requestMessage->Content = gcnew StringContent(jsonData, Encoding::UTF8, "application/json");
         Task<HttpResponseMessage^>^ responseTask = client->SendAsync(requestMessage);
+        responseTask->Wait();
         HttpResponseMessage^ response = responseTask->Result;
-        String^ responseBody = response->Content->ReadAsStringAsync()->Result;
+        Task<String^>^ readTask = response->Content->ReadAsStringAsync();
+        readTask->Wait();
+        String^ readData = readTask->Result;
 
         if (!response->IsSuccessStatusCode) {
-            String^ errorStatus = String::Format("HTTP Error: {0}", response);
+            String^ errorStatus = String::Format("HTTP Error ({0}): {1}", response->StatusCode, readData);
             txtResult->Text = errorStatus;
             Console::WriteLine(errorStatus);
             return;
         }
-        Task<String^>^ readTask = response->Content->ReadAsStringAsync();
-        readTask->Wait();
-        String^ readData = readTask->Result;
         Console::WriteLine("Return data: {0}", readData);
         txtResult->Text = readData;
     }
@@ -556,23 +585,36 @@ namespace GameApplication {
     {
         String^ url = txtBuiltUrl->Text;
         Console::WriteLine("PostVerifyIntegrityToken\nurl :{0} ", url);
+        int queryIdx = url->IndexOf("?");
+        String^ postUrl = (queryIdx > 0) ? url->Substring(0, queryIdx) : url;
+        String^ pkg = SetValueForKey("packageName");
+        String^ tok = SetValueForKey("token");
+        if (String::IsNullOrEmpty(pkg)) {
+            pkg = appSettingFiles->mPackageName;
+        }
+        if (String::IsNullOrEmpty(tok)) {
+            txtResult->Text = "Error: Integrity token is empty. Paste a Play Integrity token into the 'token' parameter row.";
+            return;
+        }
+        String^ jsonData = Serialize(gcnew IntegrityRequestData(pkg, tok));
+
         HttpClient^ client = gcnew HttpClient();
-        
-        HttpRequestMessage^ requestMessage = gcnew HttpRequestMessage(HttpMethod::Post, url);
-        requestMessage->Content = gcnew StringContent("", Encoding::UTF8, "application/json");
-        
+        HttpRequestMessage^ requestMessage = gcnew HttpRequestMessage(HttpMethod::Post, postUrl);
+        requestMessage->Content = gcnew StringContent(jsonData, Encoding::UTF8, "application/json");
+
         Task<HttpResponseMessage^>^ responseTask = client->SendAsync(requestMessage);
+        responseTask->Wait();
         HttpResponseMessage^ response = responseTask->Result;
+        Task<String^>^ readTask = response->Content->ReadAsStringAsync();
+        readTask->Wait();
+        String^ readData = readTask->Result;
 
         if (!response->IsSuccessStatusCode) {
-            String^ errorStatus = String::Format("HTTP Error: {0}", response);
+            String^ errorStatus = String::Format("HTTP Error ({0}): {1}", response->StatusCode, readData);
             txtResult->Text = errorStatus;
             Console::WriteLine(errorStatus);
             return;
         }
-        Task<String^>^ readTask = response->Content->ReadAsStringAsync();
-        readTask->Wait();
-        String^ readData = readTask->Result;
         Console::WriteLine("Return data: {0}", readData);
         txtResult->Text = readData;
     }

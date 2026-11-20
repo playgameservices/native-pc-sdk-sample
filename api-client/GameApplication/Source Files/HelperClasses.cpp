@@ -134,9 +134,10 @@ namespace GameApplication {
         {
             Console::WriteLine("Error: {0}", ex->Message);
         }
+        return "";
     }
 
-  
+
 
     Dictionary<String^, String^>^ ParseQueryParameters(String^ url) {
         try {
@@ -183,6 +184,7 @@ namespace GameApplication {
         catch (Exception^ ex) {
             Console::WriteLine("An error occurred: {0}", ex->Message);
         }
+        return nullptr;
     }
 
 

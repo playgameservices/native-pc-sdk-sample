@@ -1,6 +1,0 @@
-{
-    "lifetime": "3600s",
-    "scope": [
-        "https://www.googleapis.com/auth/androidpublisher"
-    ]
-}

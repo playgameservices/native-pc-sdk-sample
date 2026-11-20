@@ -139,7 +139,6 @@ export class Purchase {
   }
   // Convert REST response from Play Developer API
   // Note: purchaseToken unused here for one-time purchases but needed for subscriptions
-  // TODO: Wait for b/171264855 to be fixed.
   /**
    * fromApiResponse converts the response from the Google Play Developer API into a human readable class.
    *

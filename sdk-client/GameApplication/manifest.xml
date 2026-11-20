@@ -2,7 +2,9 @@
 <Manifest version="1">
   <Application>
     <PackageName>your-package-id</PackageName>
-	<IsDeveloperMode>true</IsDeveloperMode>
+    <IsDeveloperMode>true</IsDeveloperMode>
     <SKU>your-iap-product-id</SKU>
+    <CloudProjectNumber>0</CloudProjectNumber>
+    <BackendBaseUrl>https://your-project.web.app</BackendBaseUrl>
   </Application>
 </Manifest>

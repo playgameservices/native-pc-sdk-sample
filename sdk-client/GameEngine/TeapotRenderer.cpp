@@ -105,6 +105,11 @@ void TeapotRenderer::UpdateViewport() {
 }
 
 void TeapotRenderer::Unload() {
+#ifndef __ANDROID__
+    if (wglGetCurrentContext() == nullptr) {
+        return;
+    }
+#endif
     if (vbo_) {
         glDeleteBuffers(1, &vbo_);
         vbo_ = 0;
